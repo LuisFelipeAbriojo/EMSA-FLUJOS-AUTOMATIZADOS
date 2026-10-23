@@ -35,6 +35,9 @@ class Clasificador:
 
     def fit(self, d):
         d = _prep(d)
+        # el ITF que viene en la misma fila siempre va a ITF (aunque algún flujo cerrado lo haya dejado en el movimiento)
+        if 'itf_misma_fila' in d:
+            d.loc[d.itf_misma_fila.fillna(0).astype(int) == 1, 'categoria'] = 'ITF'
         self.tf_c = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 5), min_df=2, sublinear_tf=True)
         self.tf_w = TfidfVectorizer(analyzer='word', ngram_range=(1, 2), sublinear_tf=True)
         self.tf_k = TfidfVectorizer(analyzer='word', token_pattern=r'\S+')
@@ -55,10 +58,6 @@ class Clasificador:
         if 'orden' in d:
             self.orden = d.groupby(['empresa', 'tipo', 'categoria']).orden.median().to_dict()
         self.n_entrenamiento = len(d)
-        # ¿la empresa separa el ITF que viene en la misma fila? (si no, lo deja con el movimiento principal)
-        if 'itf_misma_fila' in d:
-            x = d[d.itf_misma_fila == 1]
-            self.itf_separa = (x.categoria == 'ITF').groupby(x.empresa).mean().to_dict()
         return self
 
     def orden_de(self, empresa, tipo, cat):
@@ -87,15 +86,7 @@ class Clasificador:
                 conf = max(conf, m[1]) if m[2] >= 2 else max(conf, 0.85)
             out.append((cat, round(conf, 3), alt, origen))
         res = pd.DataFrame(out, columns=['categoria', 'confianza', 'alternativa', 'origen'])
-        if 'itf_misma_fila' in d:
-            sep = getattr(self, 'itf_separa', {})
-            for i in np.where(d.itf_misma_fila.fillna(0).astype(int) == 1)[0]:
-                e = d.empresa[i]
-                if sep.get(e, 1.0) >= 0.5:
-                    res.loc[i, ['categoria', 'confianza', 'origen']] = ['ITF', 0.99, 'regla ITF']
-                else:  # esta empresa deja el ITF dentro del movimiento: misma categoría que la otra parte de la fila
-                    j = np.where((d.fila_origen == d.fila_origen[i]) & (d.hoja == d.hoja[i]) & (d.itf_misma_fila == 0))[0] \
-                        if 'fila_origen' in d else []
-                    if len(j):
-                        res.loc[i, ['categoria', 'confianza', 'origen']] = [res.categoria[j[0]], 0.99, 'regla ITF']
+        if 'itf_misma_fila' in d:  # ITF de la misma fila (BBVA y otros): siempre a la categoría ITF
+            i = np.where(d.itf_misma_fila.fillna(0).astype(int) == 1)[0]
+            res.loc[i, ['categoria', 'confianza', 'origen']] = ['ITF', 0.99, 'regla ITF']
         return res

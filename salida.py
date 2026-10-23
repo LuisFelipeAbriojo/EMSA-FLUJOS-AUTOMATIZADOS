@@ -1,6 +1,7 @@
 """Escribe el Excel clasificado de una empresa para un mes."""
 import datetime as dt
 import pandas as pd
+from comun import SECCIONES_POR_OPERACION, tipo_operacion
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -157,7 +158,11 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
         f = 9
         filas_debe, filas_haber = [], []
         for tipo_sec, cat in secs:
-            s = m[(m.categoria == cat) & (m.tipo_seccion == tipo_sec)].sort_values(['fecha', 'fila_origen'])
+            s = m[(m.categoria == cat) & (m.tipo_seccion == tipo_sec)]
+            if cat in SECCIONES_POR_OPERACION:  # overnight, BCR, cambio de moneda...: por tipo y luego por fecha
+                s = s.assign(_op=s.concepto.map(tipo_operacion)).sort_values(['_op', 'fecha', 'fila_origen'])
+            else:
+                s = s.sort_values(['fecha', 'fila_origen'])
             wc.cell(f, 1, cat).font = B
             wc.cell(f, 1).fill = GRIS
             f += 1

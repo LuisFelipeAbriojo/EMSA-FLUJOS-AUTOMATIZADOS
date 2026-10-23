@@ -66,3 +66,20 @@ _FIX = {
 def categoria(seccion):
     s = norm(seccion)
     return _FIX.get(s, s)
+
+
+# Dentro de estas secciones los movimientos se ordenan por tipo de operación y luego por fecha.
+SECCIONES_POR_OPERACION = {'ABONO TRANSF. CTAS', 'CARGO TRANSF. CTAS'}
+# (nombre, patrón) en el orden en que aparecen en la hoja; lo que no calza va al final como OTROS.
+TIPOS_OPERACION = [
+    ('OVERNIGHT', r'\bOV\w*N\w*G\w*T\b|\bOVERNIGHT|\bOVERN'),  # incluye OVERNIGTH, OVENRIGHT
+    ('BCR', r'\bBCR\b'),
+    ('CAMBIO DE MONEDA', r'DOLARES|CAMBIO (DE )?MONEDA|\bCOMU\$|\bT\.?C\.? ?\d'),
+    ('FONDOS MUTUOS', r'FONDOS? MUTUOS?|RESCATE|\bF\.? ?MUTUO|CPDADM'),
+]
+
+
+def tipo_operacion(concepto):
+    """Posición del tipo de operación (0 = OVERNIGHT ... len = OTROS) para ordenar las transferencias entre cuentas."""
+    c = norm(concepto)
+    return next((i for i, (_, p) in enumerate(TIPOS_OPERACION) if re.search(p, c)), len(TIPOS_OPERACION))
