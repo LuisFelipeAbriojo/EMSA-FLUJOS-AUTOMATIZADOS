@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificador de Flujos</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #5f6b7a; --line: #dde1e7;
+    --accent: #1f5fbf; --accent-soft: #e6eefb; --ok: #1e7b4c; --ok-soft: #e3f4ea;
+    --warn: #8a5a00; --warn-soft: #fff2cc; --bad: #b42318; --bad-soft: #fde7e5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --card: #1b2029; --text: #e7eaf0; --muted: #9aa5b4; --line: #2c3340;
+      --accent: #6ea2ff; --accent-soft: #1d2a42; --ok: #5fd39a; --ok-soft: #173326;
+      --warn: #ffcf66; --warn-soft: #3a2f12; --bad: #ff8a80; --bad-soft: #3d1c1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .privado { background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: 10px 14px;
+             margin-bottom: 16px; font-size: 14px; }
+  .motor { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+  .punto { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
+  .punto.listo { background: var(--ok); }
+  .punto.error { background: var(--bad); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  section.bloqueado { opacity: .5; pointer-events: none; }
+  .cab { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+         display: grid; place-items: center; font-weight: 600; flex: none; }
+  section.hecho .num { background: var(--ok-soft); color: var(--ok); }
+  p.ayuda { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  .zona { border: 2px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer;
+          color: var(--muted); transition: border-color .15s, background .15s; }
+  .zona:hover, .zona.sobre { border-color: var(--accent); background: var(--accent-soft); }
+  .zona input { display: none; }
+  .lista { margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+  .lista li { padding: 2px 0; overflow-wrap: anywhere; }
+  .fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 12px; }
+  label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  input[type=month], input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+          background: var(--card); color: var(--text); }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer;
+           background: var(--accent); color: #fff; }
+  button.sec { background: var(--accent-soft); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .info { margin-top: 12px; font-size: 14px; }
+  .info.ok { color: var(--ok); }
+  .info.err { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .tabla { overflow-x: auto; }
+  a.desc { color: var(--accent); font-weight: 600; text-decoration: none; }
+  a.desc:hover { text-decoration: underline; }
+  .descargas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .descargas a { background: var(--accent-soft); padding: 7px 12px; border-radius: 8px; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre#log { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px;
+            max-height: 260px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+  .girando { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+             border-radius: 50%; animation: g 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes g { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clasificador de flujos de caja</h1>
+  <p class="sub">Clasifica los movimientos del mes desde los libros bancos y arma el Excel por empresa.</p>
+  <div class="privado">🔒 Tus archivos no salen de esta computadora. Todo se procesa dentro del navegador;
+    internet solo se usa para descargar el motor la primera vez.</div>
+  <div class="motor"><span class="punto" id="punto"></span><span id="estadoMotor">Preparando el motor (Python en el navegador)… la primera vez tarda unos segundos.</span></div>
+
+  <section id="s1">
+    <div class="cab"><span class="num">1</span><h2>Modelo</h2></div>
+    <p class="ayuda">Carga <b>historico.csv</b> (entrena el modelo, unos minutos) o <b>modelo_web.pkl</b> si ya lo entrenaste antes (instantáneo).
+      Los dos están en el disco compartido.</p>
+    <div class="zona" data-input="f1"><input type="file" id="f1" accept=".csv,.pkl">Arrastra aquí el archivo o haz clic para elegirlo</div>
+    <div class="fila" id="cacheFila" hidden><button class="sec" id="usarCache">Usar el modelo guardado en este navegador</button><span class="ayuda" id="cacheInfo"></span></div>
+    <div class="info" id="i1"></div>
+    <div class="descargas" id="d1"></div>
+  </section>
+
+  <section id="s2" class="bloqueado">
+    <div class="cab"><span class="num">2</span><h2>Libros bancos del mes</h2></div>
+    <p class="ayuda">Un .xlsx por empresa (por ejemplo <i>ICP OCT 2026.xlsx</i>). El nombre del archivo debe incluir la empresa.</p>
+    <div class="zona" data-input="f2"><input type="file" id="f2" accept=".xlsx" multiple>Arrastra aquí los libros o haz clic para elegirlos</div>
+    <ul class="lista" id="l2"></ul>
+    <div class="fila">
+      <label>Mes a procesar<input type="month" id="mes"></label>
+      <label>Revisar si la confianza es menor a (%)<input type="number" id="umbral" min="50" max="100" step="1" value="90"></label>
+      <button id="b2" disabled>Clasificar</button>
+    </div>
+    <div class="info" id="i2"></div>
+    <div class="tabla" id="t2"></div>
+    <div class="descargas" id="d2"></div>
+  </section>
+
+  <section id="s3" class="bloqueado">
+    <div class="cab"><span class="num">3</span><h2>Después de revisar (opcional)</h2></div>
+    <p class="ayuda">Sube los Excel <b>CLASIFICADO</b> ya corregidos en la hoja MOVIMIENTOS. Se rehacen las hojas por cuenta y
+      se agrega el mes al histórico para que el modelo aprenda. Si cargaste un .pkl en el paso 1, incluye también <b>historico.csv</b>.</p>
+    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel revisados</div>
+    <ul class="lista" id="l3"></ul>
+    <div class="fila"><button id="b3" disabled>Actualizar</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
+    <div class="info" id="i3"></div>
+    <div class="descargas" id="d3"></div>
+  </section>
+
+  <details><summary>Detalle del proceso</summary><pre id="log"></pre></details>
+</main>
+
+<script id="codigoWorker" type="text/plain">
+importScripts('https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js');
+let py;
+const avisar = (t) => postMessage({ tipo: 'log', texto: String(t) });
+self.avisar = avisar;
+async function iniciar(fuentes) {
+  py = await loadPyodide();
+  avisar('Cargando pandas, scikit-learn y openpyxl…');
+  await py.loadPackage(['pandas', 'scikit-learn', 'scipy', 'micropip'], { messageCallback: () => {} });
+  await py.runPythonAsync("import micropip; await micropip.install('openpyxl')");
+  py.FS.mkdirTree('/app'); py.FS.mkdirTree('/entrada'); py.FS.mkdirTree('/salida');
+  for (const [nombre, codigo] of Object.entries(fuentes)) py.FS.writeFile('/app/' + nombre, codigo);
+  py.runPython("import sys; sys.path.insert(0, '/app'); import app_web");
+}
+function escribir(archivos) {
+  for (const n of py.FS.readdir('/entrada')) if (n !== '.' && n !== '..') py.FS.unlink('/entrada/' + n);
+  return archivos.map(a => { const r = '/entrada/' + a.nombre; py.FS.writeFile(r, new Uint8Array(a.bytes)); return r; });
+}
+function salidas() {
+  return py.FS.readdir('/salida').filter(n => n !== '.' && n !== '..')
+    .map(n => ({ nombre: n, bytes: py.FS.readFile('/salida/' + n).buffer }));
+}
+onmessage = async (ev) => {
+  const { id, accion, archivos, args } = ev.data;
+  try {
+    if (accion === 'iniciar') { await iniciar(args.fuentes); postMessage({ id, ok: true }); return; }
+    const rutas = escribir(archivos || []);
+    const f = py.globals.get('app_web')[accion];
+    const res = f(...args.map(x => x === '$rutas' ? py.toPy(rutas) : x === '$ruta' ? rutas[0] : Array.isArray(x) ? py.toPy(x) : x), avisar);
+    const valor = res && res.toJs ? res.toJs({ dict_converter: Object.fromEntries }) : res;
+    const sal = salidas();
+    postMessage({ id, ok: true, valor, salidas: sal }, sal.map(s => s.bytes));
+  } catch (e) {
+    postMessage({ id, ok: false, error: String(e.message || e) });
+  }
+};
+</script>
+
+<script>
+const FUENTES = {"comun.py": "\"\"\"Funciones compartidas: normalización de textos, banco, moneda y nombres de categoría.\"\"\"\nimport re, unicodedata\n\nEMPRESAS = ['REVO', 'ECSA', 'ESSA', 'SBSA', 'ONE', 'ICP', 'ELSA', 'ECNA', 'T1']\n\n\ndef norm(s):\n    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().upper()\n    return re.sub(r'\\s+', ' ', s).strip()\n\n\ndef empresa_de(nombre_archivo):\n    n = norm(nombre_archivo)\n    for e in EMPRESAS:\n        if re.search(r'\\b' + e + r'\\b', n):\n            return e\n    return None\n\n\ndef banco(hoja):\n    h = norm(hoja)\n    for b, ks in [('BCP', ['BCP']), ('BBVA', ['BBVA']), ('SCOT', ['SCOT', 'SBK']), ('IBK', ['IBK']),\n                  ('BIF', ['BIF']), ('SANT', ['SANT']), ('PICH', ['PICH']), ('NACION', ['NAC', 'BN']),\n                  ('GNB', ['GNB']), ('BCI', ['BCI']), ('FM', ['FM', 'FONDO', 'F.MUTUO'])]:\n        if any(re.search(r'(^|[^A-Z])' + re.escape(k), h) or h.startswith(k) for k in ks):\n            return b\n    return 'OTRO'\n\n\ndef moneda(hoja, cabecera=''):\n    \"\"\"USD o PEN. Primero el nombre de la hoja (es lo más confiable), luego el texto de cabecera.\"\"\"\n    h = norm(hoja)\n    if '$' in h or 'DOL' in h or re.search(r'(^|\\s)ME$', h):\n        return 'USD'\n    if (re.search(r'(SOL|PEN|MN\\b|NAC|BN\\b|CAJA)', h) or re.search(r'(BCP|BBVA|SBK|SCOT|IBK|BIF|SANTANDER)\\s?S\\b', h)\n            or re.search(r'BCP-0', h)):\n        return 'PEN'\n    c = norm(cabecera)\n    if 'M.E' in c or ' ME ' in c or '$' in c or 'DOLAR' in c:\n        return 'USD'\n    if 'M.N' in c or ' MN ' in c or 'SOLES' in c:\n        return 'PEN'\n    return 'USD' if banco(hoja) in ('PICH', 'SANT', 'GNB', 'BCI') else 'PEN'\n\n\n# Variantes de escritura de una misma sección -> un solo nombre (se respeta el estilo de sus hojas).\n_FIX = {\n    'ABONO TRANSF CTAS': 'ABONO TRANSF. CTAS', 'ABONO TRANSF.': 'ABONO TRANSF. CTAS',\n    'CARGO TRANSF CTAS': 'CARGO TRANSF. CTAS', 'CARGO TRASNF CTAS': 'CARGO TRANSF. CTAS',\n    'CARGO TRANS. CTAS': 'CARGO TRANSF. CTAS',\n    'TRANSF CIAS': 'TRANSF. ENTRE CIAS', 'TRANSF. CIAS': 'TRANSF. ENTRE CIAS', 'TRANSF ENTRE CIAS': 'TRANSF. ENTRE CIAS',\n    'TRANSF. ENTRE CIAS.': 'TRANSF. ENTRE CIAS', 'CARGO TRANSF. CIAS': 'TRANSF. ENTRE CIAS',\n    'TRANSF CIAS TCP': 'TRANSF. ENTRE CIAS',\n    'TRANSF EXTERIOR': 'TRANSF. EXTERIOR', 'TRANSF. EXT.': 'TRANSF. EXTERIOR',\n    'TRANSF EXTERIOR (FLETES Y RPTOS)': 'TRANSF. EXTERIOR',\n    'PAGO DE DETRACCIONES': 'PAGO DETRACCIONES', 'INGESOS POR ALQUILER': 'INGRESOS POR ALQUILER',\n    'DEVOLUCIONES - OTROS EGRESOS': 'DEVOLUCIONES / OTROS EGRESOS',\n    'DEVOLUCIONES / OTROS EGRESO': 'DEVOLUCIONES / OTROS EGRESOS',\n    'OTROS EGRESOS - DEVOLUCIONES': 'DEVOLUCIONES / OTROS EGRESOS',\n    'PAGO GRATIFICACION': 'GRATIFICACIONES', 'PAGO GRATIFICACIONES': 'GRATIFICACIONES',\n    'PRESTAMO TERCEROS': 'PRESTAMOS DE TERCEROS', 'FINANCIAMIENTOS': 'FINANCIAMIENTO',\n    'OTROS INGRESOS': 'OTROS INGRESOS', 'DUAS': 'PAGO DUAS', 'AFP': 'PAGO AFP',\n}\n\n\ndef categoria(seccion):\n    s = norm(seccion)\n    return _FIX.get(s, s)\n", "leer_libro.py": "\"\"\"Lee el libro bancos de una empresa (una hoja por cuenta) y devuelve solo los movimientos del mes pedido.\"\"\"\nimport datetime as dt, re\nimport openpyxl, pandas as pd\nfrom comun import norm, banco, moneda, empresa_de\n\nCOLS = ['FECHA', 'CONCEPTO', 'DEBE', 'HABER', 'SALDO']\n\n\ndef _fecha(v):\n    if isinstance(v, dt.datetime):\n        return v.date()\n    if isinstance(v, dt.date):\n        return v\n    if isinstance(v, str):\n        s = norm(v)\n        m = re.fullmatch(r'(\\d{1,2})[/\\-.](\\d{1,2})[/\\-.](\\d{2,4})', s)\n        if m:\n            d, mo, a = map(int, m.groups())\n        else:  # fechas escritas a mano: 1-SET-26, 26-APR-29, 5 OCT 2026\n            m = re.fullmatch(r'(\\d{1,2})[\\-/ .]*([A-Z]{3})[A-Z]*[\\-/ .]*(\\d{2,4})', s)\n            if not m or m.group(2) not in _MESES:\n                return None\n            d, mo, a = int(m.group(1)), _MESES[m.group(2)], int(m.group(3))\n        a += 2000 if a < 100 else 0\n        try:\n            return dt.date(a, mo, d)\n        except ValueError:\n            return None\n    return None\n\n\n_MESES = {'ENE': 1, 'JAN': 1, 'FEB': 2, 'MAR': 3, 'ABR': 4, 'APR': 4, 'MAY': 5, 'JUN': 6, 'JUL': 7,\n          'AGO': 8, 'AUG': 8, 'SET': 9, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DIC': 12, 'DEC': 12}\n\n\ndef _num(v):\n    if isinstance(v, (int, float)) and not isinstance(v, bool):\n        return float(v)\n    if isinstance(v, str):\n        try:\n            return float(v.replace(',', ''))\n        except ValueError:\n            return None\n    return None\n\n\ndef leer_empresa(ruta, anio, mes, empresa=None):\n    \"\"\"Devuelve (movimientos DataFrame, cuentas DataFrame con saldos).\"\"\"\n    empresa = empresa or empresa_de(ruta.split('/')[-1])\n    wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)\n    ini_mes = dt.date(anio, mes, 1)\n    fin_mes = (dt.date(anio + (mes == 12), mes % 12 + 1, 1))\n    movs, cuentas = [], []\n    for ws in wb.worksheets:\n        filas = list(ws.iter_rows(values_only=True))\n        cab = None\n        for i, r in enumerate(filas[:15]):\n            n = [norm(x) if x is not None else '' for x in r]\n            if 'FECHA' in n and 'CONCEPTO' in n and 'DEBE' in n:\n                cab = (i, n)\n                break\n        if not cab:\n            continue  # hojas de saldos, cheques, tipo de cambio, etc.\n        i0, n = cab\n        c = {k: n.index(k) for k in COLS if k in n}\n        cch = next((j for j, x in enumerate(n) if x.startswith('CH/')), None)\n        cop = next((j for j, x in enumerate(n) if 'OPERACION' in x), None)\n        texto_cab = ' '.join(norm(x) for r in filas[:i0] for x in r if x is not None)\n        cuenta = next((m.group(0) for m in [re.search(r'(CTA|CUENTA)[^/]*?N\\S*\\s*[\\d\\- ]{6,}', texto_cab)] if m), '')\n        mon = moneda(ws.title, texto_cab)\n        saldo_ini, saldo_fin, n_mov, deb, hab = None, None, 0, 0.0, 0.0\n        vacias, suelto = 0, False   # filas debajo de un bloque vacío = posibles proyectados\n        for k, r in enumerate(filas[i0 + 1:], start=i0 + 2):\n            r = list(r) + [None] * 20\n            f = _fecha(r[c['FECHA']])\n            if f is None:\n                if not r[c['CONCEPTO']] and not _num(r[c['DEBE']]) and not _num(r[c['HABER']]):\n                    vacias += 1\n                continue\n            if vacias >= 3 and saldo_ini is not None:\n                suelto = True\n            vacias = 0\n            s = _num(r[c['SALDO']]) if 'SALDO' in c else None\n            if f < ini_mes:\n                if s is not None:\n                    saldo_ini = s\n                continue\n            if f >= fin_mes:\n                continue\n            concepto = str(r[c['CONCEPTO']] or '').strip()\n            d, h = _num(r[c['DEBE']]), _num(r[c['HABER']])\n            if s is not None and not suelto:\n                saldo_fin = s\n            if norm(concepto).startswith('CIERRE AL'):\n                continue\n            base = dict(empresa=empresa, hoja=ws.title, cuenta=cuenta, banco=banco(ws.title), moneda=mon,\n                        fecha=f, concepto=concepto, cheque=r[cch] if cch is not None else None,\n                        operacion=r[cop] if cop is not None else None, fila_origen=k,\n                        aviso='Fila suelta al final de la hoja (¿proyectado?)' if suelto else '')\n            # BBVA y otros: el ITF viene en la misma fila que el movimiento (DEBE y HABER a la vez, ~0.005%)\n            itf = None\n            if d and h and min(d, h) / max(d, h) <= 0.0001:\n                itf = 'EGRESO' if h < d else 'INGRESO'\n            for tipo, monto in (('INGRESO', d), ('EGRESO', h)):\n                if monto:\n                    extra = {'concepto': 'ITF', 'itf_misma_fila': 1, 'concepto_padre': concepto} if tipo == itf \\\n                        else {'itf_misma_fila': 0, 'concepto_padre': ''}\n                    movs.append({**base, 'tipo': tipo, 'monto': round(monto, 2), **extra})\n                    n_mov += 1\n                    deb += monto if tipo == 'INGRESO' else 0\n                    hab += monto if tipo == 'EGRESO' else 0\n        if saldo_fin is None:\n            saldo_fin = saldo_ini\n        cuentas.append(dict(empresa=empresa, hoja=ws.title, cuenta=cuenta, banco=banco(ws.title), moneda=mon,\n                            saldo_inicial=saldo_ini or 0.0, ingresos=round(deb, 2), egresos=round(hab, 2),\n                            saldo_final=saldo_fin or 0.0, movimientos=n_mov))\n    return pd.DataFrame(movs), pd.DataFrame(cuentas)\n", "modelo.py": "\"\"\"Clasificador local de movimientos bancarios.\n\nDos capas:\n  1. Memoria: si el mismo concepto (misma empresa, mismo tipo) ya se clasificó siempre igual, se repite.\n  2. Modelo lineal (regresión logística) sobre el texto del concepto + empresa, banco, moneda, tipo y monto.\nSolo se proponen categorías que esa empresa ya usó para ese tipo (ingreso/egreso).\n\"\"\"\nimport re, unicodedata\nfrom collections import Counter, defaultdict\nimport numpy as np, pandas as pd\nfrom scipy.sparse import hstack\nfrom sklearn.feature_extraction.text import TfidfVectorizer\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.preprocessing import OneHotEncoder\n\n\ndef limpiar(s):\n    s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().upper()\n    s = re.sub(r'\\d+', '#', s)  # números de operación, facturas, fechas\n    return re.sub(r'\\s+', ' ', s).strip()\n\n\ndef _prep(d):\n    d = d.copy()\n    d['txt'] = d.concepto.map(limpiar)\n    d['raw'] = d.concepto.map(lambda x: re.sub(r'\\s+', ' ', str(x).upper()).strip())\n    d['cod'] = d.raw.map(lambda x: ' '.join('C' + c for c in re.findall(r'\\d{6,}', x)) or 'SINCOD')\n    d['rango'] = pd.cut(np.log10(d.monto.astype(float).clip(lower=0.01)), [-9, 0, 1, 2, 3, 4, 5, 6, 99],\n                        labels=False).astype(str)\n    return d\n\n\nclass Clasificador:\n    CAT = ['empresa', 'tipo', 'banco', 'moneda', 'rango']\n\n    def fit(self, d):\n        d = _prep(d)\n        self.tf_c = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 5), min_df=2, sublinear_tf=True)\n        self.tf_w = TfidfVectorizer(analyzer='word', ngram_range=(1, 2), sublinear_tf=True)\n        self.tf_k = TfidfVectorizer(analyzer='word', token_pattern=r'\\S+')\n        self.oh = OneHotEncoder(handle_unknown='ignore')\n        X = hstack([self.tf_c.fit_transform(d.txt), self.tf_w.fit_transform(d.txt), self.tf_k.fit_transform(d.cod),\n                    self.oh.fit_transform(d[self.CAT]) * 1.5]).tocsr()\n        self.lr = LogisticRegression(C=10, max_iter=3000, class_weight='balanced').fit(X, d.categoria)\n        top = lambda v: (v.most_common(1)[0][0], v.most_common(1)[0][1] / sum(v.values()), sum(v.values()))\n        m1, m2 = defaultdict(Counter), defaultdict(Counter)\n        for r, t, e, ti, c in zip(d.raw, d.txt, d.empresa, d.tipo, d.categoria):\n            m1[(r, e, ti)][c] += 1\n            m2[(t, e, ti)][c] += 1\n        self.mem_exacta = {k: top(v) for k, v in m1.items()}\n        self.mem_texto = {k: top(v) for k, v in m2.items()}\n        # categorías permitidas por empresa y tipo, y su orden habitual en las hojas\n        self.permitidas = d.groupby(['empresa', 'tipo']).categoria.agg(lambda s: set(s)).to_dict()\n        self.permitidas_tipo = d.groupby('tipo').categoria.agg(lambda s: set(s)).to_dict()\n        if 'orden' in d:\n            self.orden = d.groupby(['empresa', 'tipo', 'categoria']).orden.median().to_dict()\n        self.n_entrenamiento = len(d)\n        # ¿la empresa separa el ITF que viene en la misma fila? (si no, lo deja con el movimiento principal)\n        if 'itf_misma_fila' in d:\n            x = d[d.itf_misma_fila == 1]\n            self.itf_separa = (x.categoria == 'ITF').groupby(x.empresa).mean().to_dict()\n        return self\n\n    def orden_de(self, empresa, tipo, cat):\n        o = getattr(self, 'orden', {})\n        return o.get((empresa, tipo, cat), 999)\n\n    def predict(self, d):\n        \"\"\"Devuelve DataFrame con categoria, confianza, alternativa, origen.\"\"\"\n        d = _prep(d.reset_index(drop=True))\n        X = hstack([self.tf_c.transform(d.txt), self.tf_w.transform(d.txt), self.tf_k.transform(d.cod),\n                    self.oh.transform(d[self.CAT]) * 1.5]).tocsr()\n        P = self.lr.predict_proba(X)\n        clases = self.lr.classes_\n        out = []\n        for i, (e, ti, r, t) in enumerate(zip(d.empresa, d.tipo, d.raw, d.txt)):\n            ok = self.permitidas.get((e, ti)) or self.permitidas_tipo.get(ti, set(clases))\n            p = np.where(np.isin(clases, list(ok)), P[i], 0)\n            p = p / p.sum() if p.sum() > 0 else P[i]\n            j = np.argsort(-p)\n            cat, conf, alt, origen = clases[j[0]], float(p[j[0]]), clases[j[1]], 'modelo'\n            m = self.mem_exacta.get((r, e, ti)) or self.mem_texto.get((t, e, ti))\n            if m and m[1] >= 0.9:\n                if m[0] != cat:\n                    alt = cat\n                cat, origen = m[0], 'memoria'\n                conf = max(conf, m[1]) if m[2] >= 2 else max(conf, 0.85)\n            out.append((cat, round(conf, 3), alt, origen))\n        res = pd.DataFrame(out, columns=['categoria', 'confianza', 'alternativa', 'origen'])\n        if 'itf_misma_fila' in d:\n            sep = getattr(self, 'itf_separa', {})\n            for i in np.where(d.itf_misma_fila.fillna(0).astype(int) == 1)[0]:\n                e = d.empresa[i]\n                if sep.get(e, 1.0) >= 0.5:\n                    res.loc[i, ['categoria', 'confianza', 'origen']] = ['ITF', 0.99, 'regla ITF']\n                else:  # esta empresa deja el ITF dentro del movimiento: misma categoría que la otra parte de la fila\n                    j = np.where((d.fila_origen == d.fila_origen[i]) & (d.hoja == d.hoja[i]) & (d.itf_misma_fila == 0))[0] \\\n                        if 'fila_origen' in d else []\n                    if len(j):\n                        res.loc[i, ['categoria', 'confianza', 'origen']] = [res.categoria[j[0]], 0.99, 'regla ITF']\n        return res\n", "salida.py": "\"\"\"Escribe el Excel clasificado de una empresa para un mes.\"\"\"\nimport datetime as dt\nimport pandas as pd\nfrom openpyxl import Workbook\nfrom openpyxl.styles import Font, PatternFill, Alignment, Border, Side\nfrom openpyxl.utils import get_column_letter\nfrom openpyxl.worksheet.datavalidation import DataValidation\n\nAMARILLO = PatternFill('solid', fgColor='FFF2CC')\nGRIS = PatternFill('solid', fgColor='EDEDED')\nAZUL = PatternFill('solid', fgColor='DDEBF7')\nROJO = PatternFill('solid', fgColor='F8CBAD')\nB = Font(bold=True)\nNUM = '#,##0.00;[Red]-#,##0.00'\nLINEA = Border(top=Side(style='thin'))\nMESES = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'OCTUBRE',\n         'NOVIEMBRE', 'DICIEMBRE']\n\n\ndef secciones(mov, modelo, empresa):\n    \"\"\"Lista ordenada de (tipo, categoria): las que la empresa suele usar + las que aparecen este mes.\"\"\"\n    usadas = set()\n    for tipo in ('INGRESO', 'EGRESO'):\n        for c in modelo.permitidas.get((empresa, tipo), set()):\n            usadas.add((tipo, c))\n    usadas |= set(zip(mov.tipo_seccion, mov.categoria))\n    return sorted(usadas, key=lambda tc: (tc[0] != 'INGRESO', modelo.orden_de(empresa, tc[0], tc[1]), tc[1]))\n\n\ndef escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):\n    mov = mov.copy()\n    # el ITF que la empresa deja dentro del movimiento va en la misma sección que la otra parte de la fila\n    mov['tipo_seccion'] = mov.tipo\n    if 'itf_misma_fila' in mov:\n        for i in mov.index[(mov.itf_misma_fila == 1) & (mov.categoria != 'ITF')]:\n            otra = mov[(mov.hoja == mov.hoja[i]) & (mov.fila_origen == mov.fila_origen[i]) & (mov.index != i)]\n            if len(otra):\n                mov.loc[i, 'tipo_seccion'] = otra.tipo.iloc[0]\n    mov['revisar'] = (mov.confianza < umbral)\n    secs = secciones(mov, modelo, empresa)\n    wb = Workbook()\n\n    # ---------- RESUMEN ----------\n    ws = wb.active\n    ws.title = 'RESUMEN'\n    ws['A1'] = f'{empresa} – FLUJO {MESES[mes]} {anio} (clasificación automática)'\n    ws['A1'].font = Font(bold=True, size=13)\n    ws['A2'] = (f'Generado {dt.datetime.now():%d/%m/%Y %H:%M}. Filas amarillas = revisar (confianza < {umbral:.0%}). '\n                'Si corriges una categoría en MOVIMIENTOS, este resumen se recalcula solo; '\n                'las hojas por cuenta se rehacen con actualizar.py.')\n    ws['A2'].font = Font(italic=True, color='666666')\n    hdr = ['CUENTA', 'Nº CUENTA', 'MONEDA', 'SALDO INICIAL', 'INGRESOS', 'EGRESOS', 'SALDO FINAL (calc.)',\n           'SALDO SEGÚN LIBRO', 'DIFERENCIA', 'MOVIMIENTOS', 'A REVISAR']\n    ws.append([])\n    ws.append(hdr)\n    for c in ws[4]:\n        c.font, c.fill = B, AZUL\n    cu = cuentas[cuentas.movimientos > 0].reset_index(drop=True)\n    for k, r in cu.iterrows():\n        f = 5 + k\n        ws.append([r.hoja, r.cuenta, r.moneda, r.saldo_inicial, r.ingresos, r.egresos, f'=D{f}+E{f}-F{f}',\n                   r.saldo_final, f'=ROUND(G{f}-H{f},2)', r.movimientos, int(mov[mov.hoja == r.hoja].revisar.sum())])\n        for col in 'DEFGHI':\n            ws[f'{col}{f}'].number_format = NUM\n        if abs(r.saldo_inicial + r.ingresos - r.egresos - r.saldo_final) > 0.05:\n            for col in 'GHI':\n                ws[f'{col}{f}'].fill = ROJO\n    fin = 5 + len(cu)\n    ws.cell(fin, 1, 'Rojo = el saldo del libro no coincide con saldo inicial + movimientos del mes '\n                    '(suele ser una fila con fecha de otro mes dentro del bloque, o saldo mal arrastrado).').font = \\\n        Font(italic=True, color='C00000')\n    sin = cuentas[cuentas.movimientos == 0].hoja.tolist()\n    if sin:\n        ws.cell(fin + 1, 1, 'Cuentas sin movimientos en el mes: ' + ', '.join(sin)).font = Font(italic=True, color='666666')\n\n    # matriz categoría x cuenta con SUMIFS (se recalcula si corrigen MOVIMIENTOS)\n    f0 = fin + 3\n    ws.cell(f0, 1, 'TOTALES POR CATEGORÍA (en la moneda de cada cuenta)').font = B\n    ws.cell(f0 + 1, 1, 'TIPO').font = B\n    ws.cell(f0 + 1, 2, 'CATEGORÍA').font = B\n    for j, h in enumerate(cu.hoja):\n        c = ws.cell(f0 + 1, 3 + j, f'{h} ({cu.moneda[j]})')\n        c.font, c.fill = B, AZUL\n    n = len(mov) + 1\n    for i, (tipo, cat) in enumerate(secs):\n        f = f0 + 2 + i\n        ws.cell(f, 1, tipo)\n        ws.cell(f, 2, cat)\n        for j, h in enumerate(cu.hoja):\n            col = get_column_letter(3 + j)\n            c = ws.cell(f, 3 + j, f'=SUMIFS(MOVIMIENTOS!$F$2:$F${n},MOVIMIENTOS!$A$2:$A${n},\"{h}\",'\n                                  f'MOVIMIENTOS!$G$2:$G${n},$B{f},MOVIMIENTOS!$E$2:$E${n},$A{f})')\n            c.number_format = NUM\n    ws.column_dimensions['A'].width = 22\n    ws.column_dimensions['B'].width = 34\n    for j in range(3, 3 + max(len(cu), 9)):\n        ws.column_dimensions[get_column_letter(j)].width = 16\n\n    # ---------- MOVIMIENTOS (editable) ----------\n    wm = wb.create_sheet('MOVIMIENTOS')\n    cols = ['CUENTA', 'MONEDA', 'FECHA', 'CONCEPTO', 'TIPO', 'MONTO', 'CATEGORIA', 'CONFIANZA', 'ALTERNATIVA',\n            'REVISAR', 'ORIGEN', 'NOTA', 'Nº OPERACION', 'CH/Nº', 'FILA EN LIBRO']\n    wm.append(cols)\n    for c in wm[1]:\n        c.font, c.fill = B, AZUL\n    orden_hojas = {h: i for i, h in enumerate(cuentas.hoja)}\n    mv = mov.assign(_o=mov.hoja.map(orden_hojas)).sort_values(['_o', 'fecha', 'fila_origen'])\n    for _, r in mv.iterrows():\n        nota = r.get('aviso', '') or ''\n        if r.get('itf_misma_fila', 0) == 1:\n            nota = (nota + ' ITF que venía en la misma fila de: ' + str(r.get('concepto_padre', ''))).strip()\n        wm.append([r.hoja, r.moneda, r.fecha, r.concepto, r.tipo, r.monto, r.categoria, r.confianza,\n                   r.alternativa, 'SI' if r.revisar else '', r.origen, nota,\n                   r.operacion if pd.notna(r.operacion) else None, r.cheque if pd.notna(r.cheque) else None,\n                   int(r.fila_origen)])\n        if r.revisar:\n            for c in wm[wm.max_row]:\n                c.fill = AMARILLO\n    for row in wm.iter_rows(min_row=2, min_col=3, max_col=3):\n        row[0].number_format = 'DD/MM/YYYY'\n    for row in wm.iter_rows(min_row=2, min_col=6, max_col=6):\n        row[0].number_format = NUM\n    for row in wm.iter_rows(min_row=2, min_col=8, max_col=8):\n        row[0].number_format = '0%'\n    for col, w in zip('ABCDEFGHIJKLMNO', [16, 7, 11, 42, 9, 14, 30, 10, 28, 8, 10, 40, 14, 8, 8]):\n        wm.column_dimensions[col].width = w\n    wm.freeze_panes = 'A2'\n    wm.auto_filter.ref = f'A1:O{wm.max_row}'\n    # lista desplegable de categorías\n    wl = wb.create_sheet('LISTAS')\n    cats = sorted({c for _, c in secs})\n    for i, c in enumerate(cats, 1):\n        wl.cell(i, 1, c)\n    wl.sheet_state = 'hidden'\n    dv = DataValidation(type='list', formula1=f'=LISTAS!$A$1:$A${len(cats)}', allow_blank=False,\n                        showErrorMessage=False)\n    wm.add_data_validation(dv)\n    dv.add(f'G2:G{max(wm.max_row, 2)}')\n\n    # ---------- una hoja por cuenta, agrupada como sus RESUMEN FLUJO ----------\n    for _, cta in cuentas.iterrows():\n        m = mov[mov.hoja == cta.hoja]\n        if m.empty:\n            continue\n        wc = wb.create_sheet(cta.hoja[:31])\n        wc['A1'] = empresa\n        wc['A2'] = cta.cuenta or cta.hoja\n        wc['A3'] = f'{MESES[mes]} {anio} – {cta.moneda}'\n        for a in ('A1', 'A2', 'A3'):\n            wc[a].font = B\n        wc['C5'], wc['C6'] = 'SALDO INICIAL', 'SALDO FINAL'\n        wc['D5'] = cta.saldo_inicial\n        wc['A7'], wc['B7'], wc['C7'], wc['D7'], wc['F7'], wc['G7'] = \\\n            'FECHA', 'CONCEPTO', 'DEBE', 'HABER', 'CONF.', 'Nº OPERACION'\n        for c in wc[7]:\n            c.font, c.fill = B, AZUL\n        f = 9\n        filas_debe, filas_haber = [], []\n        for tipo_sec, cat in secs:\n            s = m[(m.categoria == cat) & (m.tipo_seccion == tipo_sec)].sort_values(['fecha', 'fila_origen'])\n            wc.cell(f, 1, cat).font = B\n            wc.cell(f, 1).fill = GRIS\n            f += 1\n            ini = f\n            for _, r in s.iterrows():\n                wc.cell(f, 1, r.fecha).number_format = 'DD/MM/YYYY'\n                wc.cell(f, 2, r.concepto)\n                wc.cell(f, 3 if r.tipo == 'INGRESO' else 4, r.monto).number_format = NUM\n                wc.cell(f, 6, r.confianza).number_format = '0%'\n                if pd.notna(r.operacion):\n                    wc.cell(f, 7, r.operacion)\n                if r.revisar:\n                    for col in range(1, 8):\n                        wc.cell(f, col).fill = AMARILLO\n                f += 1\n            colsub = 'C' if tipo_sec == 'INGRESO' else 'D'\n            c = wc.cell(f, 5, f'=SUM(C{ini}:D{f - 1})' if f > ini else 0)\n            c.number_format, c.font, c.border = NUM, B, LINEA\n            if f > ini:\n                filas_debe.append(f'C{ini}:C{f - 1}')\n                filas_haber.append(f'D{ini}:D{f - 1}')\n            f += 2\n        wc.cell(f, 2, 'TOTALES').font = B\n        wc.cell(f, 3, '=' + ('+'.join(f'SUM({x})' for x in filas_debe) or '0')).number_format = NUM\n        wc.cell(f, 4, '=' + ('+'.join(f'SUM({x})' for x in filas_haber) or '0')).number_format = NUM\n        wc.cell(f, 3).font = wc.cell(f, 4).font = B\n        wc['D6'] = f'=D5+C{f}-D{f}'\n        wc['E6'] = cta.saldo_final\n        wc['F6'] = '=ROUND(D6-E6,2)'\n        wc['E5'] = 'según libro →'\n        wc['E5'].font = Font(italic=True, color='666666')\n        for a in ('D5', 'D6', 'E6', 'F6'):\n            wc[a].number_format = NUM\n        wc.column_dimensions['A'].width = 12\n        wc.column_dimensions['B'].width = 44\n        for col in 'CDE':\n            wc.column_dimensions[col].width = 15\n        wc.column_dimensions['G'].width = 14\n        wc.freeze_panes = 'A8'\n    wb.move_sheet('MOVIMIENTOS', offset=-(len(wb.sheetnames) - 2))\n    wb.save(ruta)\n    return mov\n", "entrenar.py": "\"\"\"Entrena (o reentrena) el modelo.\n\nUso: python entrenar.py historico.csv [modelo.pkl]\nEl histórico sale de extraer_historico.py (flujos cerrados) y crece con actualizar.py (meses revisados).\n\"\"\"\nimport os, pickle, sys\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nimport pandas as pd\nfrom modelo import Clasificador\n\n\ndef entrenar(h):\n    \"\"\"Devuelve (modelo, histórico usado).\"\"\"\n    # si un mismo mes/empresa vino de dos fuentes (flujo cerrado y revisión), prima la revisión\n    if 'fuente' in h:\n        rev = set(zip(h[h.fuente == 'revision'].empresa, h[h.fuente == 'revision'].periodo))\n        h = h[(h.fuente == 'revision') | ~pd.Series(list(zip(h.empresa, h.periodo))).isin(rev).values]\n    return Clasificador().fit(h), h\n\n\nif __name__ == '__main__':\n    salida = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modelo.pkl')\n    m, h = entrenar(pd.read_csv(sys.argv[1]))\n    pickle.dump(m, open(salida, 'wb'))\n    print(f'Modelo entrenado con {len(h)} movimientos, {h.empresa.nunique()} empresas, '\n          f'{h.periodo.nunique()} meses, {h.categoria.nunique()} categorías -> {salida}')\n", "clasificar_mes.py": "\"\"\"Clasifica el mes cerrado a partir de los libros bancos de cada empresa.\n\nUso:\n    python clasificar_mes.py LIBROS... [--mes 2026-10] [--modelo modelo.pkl] [--salida carpeta] [--umbral 0.9]\n\nLIBROS: los .xlsx de cada empresa (ECSA SET 2026.xlsx, ...) o una carpeta que los contenga.\n--mes: por defecto el mes anterior al de hoy (en noviembre procesa octubre).\nGenera \"<EMPRESA> FLUJO <MES> CLASIFICADO.xlsx\" por empresa.\n\"\"\"\nimport argparse, datetime as dt, glob, os, pickle, sys, warnings\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nwarnings.filterwarnings('ignore')\nimport pandas as pd\nfrom leer_libro import leer_empresa\nfrom comun import empresa_de\nfrom salida import escribir, MESES\n\nAQUI = os.path.dirname(os.path.abspath(__file__))\n\n\ndef mes_anterior():\n    h = dt.date.today().replace(day=1) - dt.timedelta(days=1)\n    return h.year, h.month\n\n\ndef clasificar(archivos, anio, mes, modelo, salida='.', umbral=0.9, avisar=print):\n    \"\"\"Escribe un Excel clasificado por empresa en `salida` y devuelve un resumen por archivo generado.\"\"\"\n    os.makedirs(salida, exist_ok=True)\n    avisar(f'Mes a procesar: {MESES[mes]} {anio}  (umbral de revisión {umbral:.0%})\\n')\n    hechos = []\n    for f in archivos:\n        emp = empresa_de(os.path.basename(f))\n        if not emp:\n            avisar(f'  ?  No reconozco la empresa en \"{os.path.basename(f)}\", lo salto.')\n            continue\n        mov, cuentas = leer_empresa(f, anio, mes, emp)\n        if mov.empty:\n            avisar(f'  {emp:5s} sin movimientos en {MESES[mes]} {anio}')\n            continue\n        pred = modelo.predict(mov)\n        mov = pd.concat([mov.reset_index(drop=True), pred], axis=1)\n        ruta = os.path.join(salida, f'{emp} FLUJO {MESES[mes]} {anio} CLASIFICADO.xlsx')\n        mov = escribir(ruta, emp, anio, mes, mov, cuentas, modelo, umbral)\n        descuadre = cuentas[(cuentas.saldo_inicial + cuentas.ingresos - cuentas.egresos - cuentas.saldo_final).abs() > 0.05]\n        hechos.append(dict(empresa=emp, ruta=ruta, movimientos=len(mov), revisar=int(mov.revisar.sum()),\n                           cuentas=len(cuentas[cuentas.movimientos > 0]), descuadres=len(descuadre)))\n        avisar(f'  {emp:5s} {len(mov):5d} movimientos en {len(cuentas[cuentas.movimientos > 0])} cuentas | '\n               f'revisar {int(mov.revisar.sum()):4d} | cuentas con descuadre de saldo: {len(descuadre)} -> {ruta}')\n    return hechos\n\n\ndef main():\n    ap = argparse.ArgumentParser()\n    ap.add_argument('libros', nargs='+')\n    ap.add_argument('--mes', help='AAAA-MM (por defecto, el mes anterior)')\n    ap.add_argument('--modelo', default=os.path.join(AQUI, 'modelo.pkl'))\n    ap.add_argument('--salida', default='.')\n    ap.add_argument('--umbral', type=float, default=0.9)\n    a = ap.parse_args()\n    anio, mes = map(int, a.mes.split('-')) if a.mes else mes_anterior()\n    modelo = pickle.load(open(a.modelo, 'rb'))\n    archivos = []\n    for x in a.libros:\n        archivos += sorted(glob.glob(os.path.join(x, '*.xlsx'))) if os.path.isdir(x) else [x]\n    archivos = [f for f in archivos if not os.path.basename(f).startswith('~$')]\n    clasificar(archivos, anio, mes, modelo, a.salida, a.umbral)\n\n\nif __name__ == '__main__':\n    main()\n", "actualizar.py": "\"\"\"Después de revisar: rehace las hojas por cuenta y guarda las correcciones para que el modelo aprenda.\n\nUso: python actualizar.py \"ICP FLUJO SETIEMBRE 2026 CLASIFICADO.xlsx\" [...] [--historico historico.csv]\n\nLee la hoja MOVIMIENTOS (con las categorías que corrigieron), regenera las hojas agrupadas por cuenta\ny agrega el mes al histórico. Luego: python entrenar.py historico.csv\n\"\"\"\nimport argparse, os, pickle, re, sys, warnings\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nwarnings.filterwarnings('ignore')\nimport openpyxl, pandas as pd\nfrom comun import banco, moneda\nfrom salida import escribir, MESES\n\nAQUI = os.path.dirname(os.path.abspath(__file__))\n\n\ndef actualizar(archivos, h, modelo, umbral=0.9, avisar=print):\n    \"\"\"Rehace cada archivo revisado en su sitio y devuelve el histórico h con esos meses agregados.\"\"\"\n    nuevos = []\n    for f in archivos:\n        emp = os.path.basename(f).split()[0]\n        m = re.search(r'FLUJO (\\w+) (\\d{4})', os.path.basename(f))\n        mes, anio = MESES.index(m.group(1)), int(m.group(2))\n        mv = pd.read_excel(f, sheet_name='MOVIMIENTOS')\n        # saldos y cuentas desde la hoja RESUMEN\n        wb = openpyxl.load_workbook(f, data_only=False)\n        ws = wb['RESUMEN']\n        cuentas = []\n        for r in ws.iter_rows(min_row=5, values_only=True):\n            if not r[0] or r[2] not in ('USD', 'PEN'):\n                break\n            cuentas.append(dict(hoja=r[0], cuenta=r[1], moneda=r[2], saldo_inicial=r[3], ingresos=r[4], egresos=r[5],\n                                saldo_final=r[7], movimientos=r[9]))\n        cuentas = pd.DataFrame(cuentas)\n        mov = pd.DataFrame(dict(\n            empresa=emp, hoja=mv.CUENTA, moneda=mv.MONEDA, fecha=pd.to_datetime(mv.FECHA).dt.date, concepto=mv.CONCEPTO,\n            tipo=mv.TIPO, monto=mv.MONTO, categoria=mv.CATEGORIA.astype(str).str.strip().str.upper(),\n            confianza=mv.CONFIANZA, alternativa=mv.ALTERNATIVA, origen=mv.ORIGEN, aviso=mv.NOTA.fillna(''),\n            operacion=mv['Nº OPERACION'], cheque=mv['CH/Nº'], fila_origen=mv['FILA EN LIBRO'],\n            itf_misma_fila=mv.NOTA.fillna('').str.contains('misma fila').astype(int), concepto_padre=''))\n        # lo que el equipo revisó ya no está \"por revisar\"\n        mov.loc[mov.confianza < umbral, ['confianza', 'origen']] = [1.0, 'revisado']\n        escribir(f, emp, anio, mes, mov, cuentas, modelo, umbral)\n        nuevos.append(pd.DataFrame(dict(\n            itf_misma_fila=mov.itf_misma_fila, empresa=emp, periodo=f'{anio}-{mes:02d}', hoja=mov.hoja,\n            banco=mov.hoja.map(banco), moneda=mov.moneda, fecha=mov.fecha.astype(str), concepto=mov.concepto,\n            tipo=mov.tipo, monto=mov.monto, categoria=mov.categoria,\n            orden=[modelo.orden_de(emp, t, c) for t, c in zip(mov.tipo, mov.categoria)],\n            archivo=os.path.basename(f), fuente='revision')))\n        avisar(f'{emp}: hojas por cuenta rehechas; {len(mov)} movimientos listos para el histórico.')\n\n    h = h.copy()\n    if 'fuente' not in h:\n        h['fuente'] = 'flujo cerrado'\n    n = pd.concat(nuevos)\n    clave = set(zip(n.empresa, n.periodo))\n    h = h[~pd.Series(list(zip(h.empresa, h.periodo)), dtype=object).isin(clave).values | (h.fuente != 'revision')]\n    return pd.concat([h, n])\n\n\nif __name__ == '__main__':\n    ap = argparse.ArgumentParser()\n    ap.add_argument('archivos', nargs='+')\n    ap.add_argument('--historico', default=os.path.join(AQUI, 'historico.csv'))\n    ap.add_argument('--modelo', default=os.path.join(AQUI, 'modelo.pkl'))\n    ap.add_argument('--umbral', type=float, default=0.9)\n    a = ap.parse_args()\n    modelo = pickle.load(open(a.modelo, 'rb'))\n    h = pd.read_csv(a.historico) if os.path.exists(a.historico) else pd.DataFrame()\n    actualizar(a.archivos, h, modelo, a.umbral).to_csv(a.historico, index=False)\n    print(f'Histórico actualizado: {a.historico}. Ahora corre: python entrenar.py \"{a.historico}\"')\n", "app_web.py": "\"\"\"Puente entre la página web (index.html) y el clasificador. Corre dentro del navegador con Pyodide.\n\nCada función recibe rutas del sistema de archivos virtual del navegador y deja lo que hay que\ndescargar en /salida. Nada se envía a ningún servidor.\n\"\"\"\nimport os, pickle, shutil, warnings, zipfile\nwarnings.filterwarnings('ignore')\nimport pandas as pd\nfrom entrenar import entrenar\nfrom clasificar_mes import clasificar as _clasificar\nfrom actualizar import actualizar as _actualizar\n\nSALIDA = '/salida'\nMODELO = None\nHIST = None\n\n\ndef _vaciar_salida():\n    shutil.rmtree(SALIDA, ignore_errors=True)\n    os.makedirs(SALIDA)\n\n\ndef _info_modelo():\n    m = MODELO\n    return dict(movimientos=int(m.n_entrenamiento),\n                empresas=sorted({e for e, _ in m.permitidas}),\n                categorias=int(len(m.lr.classes_)),\n                meses=sorted(HIST.periodo.astype(str).unique().tolist()) if HIST is not None else [])\n\n\ndef cargar_historico(ruta, avisar):\n    \"\"\"Entrena con historico.csv y deja modelo_web.pkl para descargar.\"\"\"\n    global MODELO, HIST\n    _vaciar_salida()\n    HIST = pd.read_csv(ruta)\n    avisar(f'Histórico leído: {len(HIST):,} movimientos. Entrenando (puede tardar unos minutos)...')\n    MODELO, _ = entrenar(HIST)\n    pickle.dump(MODELO, open(f'{SALIDA}/modelo_web.pkl', 'wb'))\n    avisar('Modelo entrenado.')\n    return _info_modelo()\n\n\ndef cargar_modelo(ruta, avisar):\n    global MODELO\n    _vaciar_salida()\n    MODELO = pickle.load(open(ruta, 'rb'))\n    avisar('Modelo cargado.')\n    return _info_modelo()\n\n\ndef clasificar(rutas, anio, mes, umbral, avisar):\n    _vaciar_salida()\n    rutas = [r for r in rutas if not os.path.basename(r).startswith('~$')]\n    hechos = _clasificar(rutas, int(anio), int(mes), MODELO, SALIDA, float(umbral), avisar)\n    for h in hechos:\n        h['archivo'] = os.path.basename(h.pop('ruta'))\n    if len(hechos) > 1:\n        with zipfile.ZipFile(f'{SALIDA}/FLUJOS CLASIFICADOS {anio}-{int(mes):02d}.zip', 'w', zipfile.ZIP_DEFLATED) as z:\n            for h in hechos:\n                z.write(f\"{SALIDA}/{h['archivo']}\", h['archivo'])\n    return hechos\n\n\ndef actualizar(rutas, ruta_historico, umbral, avisar):\n    \"\"\"Rehace los Excel revisados y devuelve el histórico con esos meses agregados.\"\"\"\n    global HIST\n    _vaciar_salida()\n    if ruta_historico:\n        HIST = pd.read_csv(ruta_historico)\n    if HIST is None:\n        raise ValueError('Falta historico.csv: cárgalo en el paso 1 o junto con los Excel revisados.')\n    copias = []\n    for r in rutas:\n        destino = f'{SALIDA}/{os.path.basename(r)}'\n        shutil.copy(r, destino)\n        copias.append(destino)\n    HIST = _actualizar(copias, HIST, MODELO, float(umbral), avisar)\n    HIST.to_csv(f'{SALIDA}/historico.csv', index=False)\n    avisar(f'Histórico actualizado: {len(HIST):,} movimientos.')\n    return dict(movimientos=len(HIST))\n\n\ndef reentrenar(avisar):\n    global MODELO\n    _vaciar_salida()\n    avisar('Reentrenando con el histórico actualizado...')\n    MODELO, _ = entrenar(HIST)\n    pickle.dump(MODELO, open(f'{SALIDA}/modelo_web.pkl', 'wb'))\n    avisar('Modelo reentrenado.')\n    return _info_modelo()\n"};
+const $ = (id) => document.getElementById(id);
+const log = (t) => { $('log').textContent += t + '\n'; $('log').scrollTop = 1e9; };
+
+// ---------- motor (Python en un Web Worker para no congelar la página) ----------
+const worker = new Worker(URL.createObjectURL(new Blob([$('codigoWorker').textContent], { type: 'text/javascript' })));
+const pendientes = {};
+let sig = 0;
+worker.onmessage = (ev) => {
+  const m = ev.data;
+  if (m.tipo === 'log') { log(m.texto); return; }
+  const p = pendientes[m.id]; delete pendientes[m.id];
+  m.ok ? p.ok(m) : p.mal(new Error(m.error));
+};
+function llamar(accion, args, archivos = []) {
+  const id = ++sig;
+  return new Promise((ok, mal) => { pendientes[id] = { ok, mal }; worker.postMessage({ id, accion, args, archivos }); });
+}
+async function leer(files) {
+  return Promise.all([...files].map(async f => ({ nombre: f.name, bytes: await f.arrayBuffer() })));
+}
+
+// ---------- utilidades de interfaz ----------
+let ocupado = false;
+async function trabajar(infoId, texto, fn) {
+  if (ocupado) return;
+  ocupado = true; actualizarBotones();
+  const t0 = Date.now(), info = $(infoId);
+  info.className = 'info';
+  const reloj = setInterval(() => { info.innerHTML = `<span class="girando"></span>${texto} (${Math.round((Date.now() - t0) / 1000)} s)`; }, 500);
+  info.innerHTML = `<span class="girando"></span>${texto}`;
+  try { await fn(info); }
+  catch (e) { info.className = 'info err'; info.textContent = 'Error: ' + e.message; log('ERROR: ' + e.message); }
+  finally { clearInterval(reloj); ocupado = false; actualizarBotones(); }
+}
+function descargas(contenedor, salidas, filtro = () => true) {
+  const d = $(contenedor); d.innerHTML = '';
+  for (const s of salidas.filter(filtro)) {
+    const a = document.createElement('a');
+    a.className = 'desc'; a.textContent = '⬇ ' + s.nombre; a.download = s.nombre;
+    a.href = URL.createObjectURL(new Blob([s.bytes]));
+    d.appendChild(a);
+  }
+}
+function zona(inputId, alCambiar) {
+  const inp = $(inputId), z = inp.parentElement;
+  z.addEventListener('click', () => inp.click());
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('sobre'); });
+  z.addEventListener('dragleave', () => z.classList.remove('sobre'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('sobre'); alCambiar([...e.dataTransfer.files]); });
+  inp.addEventListener('change', () => { alCambiar([...inp.files]); inp.value = ''; });
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
+
+let motorListo = false, hayModelo = false, libros = [], revisados = [];
+function actualizarBotones() {
+  $('s2').classList.toggle('bloqueado', !hayModelo);
+  $('s3').classList.toggle('bloqueado', !hayModelo);
+  $('b2').disabled = ocupado || !libros.length;
+  $('b3').disabled = ocupado || !revisados.some(f => /\.xlsx$/i.test(f.name));
+  $('b3r').disabled = ocupado;
+  $('usarCache').disabled = ocupado || !motorListo;
+}
+
+// ---------- guardar el modelo entrenado en este navegador (comodidad; si falla no pasa nada) ----------
+const DB = 'clasificador-flujos';
+function idb(modo, fn) {
+  return new Promise((ok, mal) => {
+    try {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { const tx = r.result.transaction('kv', modo); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => ok(q && q.result); tx.onerror = () => mal(tx.error); };
+      r.onerror = () => mal(r.error);
+    } catch (e) { mal(e); }
+  });
+}
+const guardarCache = (bytes, meta) => idb('readwrite', s => s.put({ bytes, meta }, 'modelo')).catch(() => {});
+const leerCache = () => idb('readonly', s => s.get('modelo')).catch(() => null);
+
+function mostrarModelo(info, m) {
+  info.className = 'info ok';
+  info.innerHTML = `✔ Modelo listo: ${m.movimientos.toLocaleString('es-PE')} movimientos de entrenamiento, ` +
+    `${m.categorias} categorías, empresas: ${m.empresas.join(', ')}` + (m.meses.length ? ` · meses: ${m.meses.join(', ')}` : '');
+  hayModelo = true; $('s1').classList.add('hecho'); actualizarBotones();
+}
+async function modeloEntrenado(r, info) {
+  mostrarModelo(info, r.valor);
+  const pkl = r.salidas.find(s => s.nombre === 'modelo_web.pkl');
+  if (pkl) {
+    await guardarCache(pkl.bytes.slice(0), { fecha: new Date().toISOString(), ...r.valor });
+    descargas('d1', r.salidas);
+  }
+}
+
+// ---------- paso 1 ----------
+zona('f1', async (files) => {
+  const f = files[0]; if (!f || !motorListo) return;
+  $('d1').innerHTML = '';
+  if (/\.pkl$/i.test(f.name)) {
+    await trabajar('i1', 'Cargando el modelo…', async (info) => {
+      const r = await llamar('cargar_modelo', ['$ruta'], await leer([f]));
+      mostrarModelo(info, r.valor);
+    });
+  } else {
+    await trabajar('i1', 'Entrenando el modelo con el histórico… (unos minutos, puedes dejar la pestaña abierta)', async (info) => {
+      const r = await llamar('cargar_historico', ['$ruta'], await leer([f]));
+      await modeloEntrenado(r, info);
+      $('d1').insertAdjacentHTML('afterbegin', '<span class="ayuda">Guarda este archivo en el disco compartido para no volver a entrenar:</span>');
+    });
+  }
+});
+$('usarCache').onclick = async () => {
+  const c = await leerCache(); if (!c) return;
+  await trabajar('i1', 'Cargando el modelo guardado…', async (info) => {
+    const r = await llamar('cargar_modelo', ['$ruta'], [{ nombre: 'modelo_web.pkl', bytes: c.bytes }]);
+    mostrarModelo(info, { ...r.valor, meses: c.meta.meses || [] });
+  });
+};
+
+// ---------- paso 2 ----------
+(function () {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  $('mes').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+zona('f2', (files) => {
+  libros = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('l2', libros); actualizarBotones();
+});
+$('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
+  const [anio, mes] = $('mes').value.split('-').map(Number);
+  const umbral = Number($('umbral').value) / 100;
+  $('t2').innerHTML = ''; $('d2').innerHTML = '';
+  const r = await llamar('clasificar', ['$rutas', anio, mes, umbral], await leer(libros));
+  const hechos = r.valor;
+  if (!hechos.length) { info.className = 'info err'; info.textContent = 'No salió ningún archivo: revisa el mes elegido y los nombres de los libros (ver detalle).'; return; }
+  const tot = hechos.reduce((a, h) => a + h.movimientos, 0), rev = hechos.reduce((a, h) => a + h.revisar, 0);
+  info.className = 'info ok';
+  info.textContent = `✔ ${tot.toLocaleString('es-PE')} movimientos clasificados en ${hechos.length} empresas · ${rev} para revisar (filas amarillas).`;
+  const urls = Object.fromEntries(r.salidas.map(s => [s.nombre, URL.createObjectURL(new Blob([s.bytes]))]));
+  $('t2').innerHTML = '<table><tr><th>Empresa</th><th class="n">Movimientos</th><th class="n">Cuentas</th><th>Revisar</th><th>Saldos</th><th></th></tr>' +
+    hechos.map(h => `<tr><td><b>${esc(h.empresa)}</b></td><td class="n">${h.movimientos.toLocaleString('es-PE')}</td><td class="n">${h.cuentas}</td>
+      <td><span class="chip ${h.revisar ? 'warn' : 'ok'}">${h.revisar}</span></td>
+      <td>${h.descuadres ? `<span class="chip bad">${h.descuadres} no cuadra${h.descuadres > 1 ? 'n' : ''}</span>` : '<span class="chip ok">cuadran</span>'}</td>
+      <td><a class="desc" href="${urls[h.archivo]}" download="${esc(h.archivo)}">⬇ Excel</a></td></tr>`).join('') + '</table>';
+  descargas('d2', r.salidas, s => s.nombre.endsWith('.zip'));
+});
+
+// ---------- paso 3 ----------
+zona('f3', (files) => { revisados = files; lista('l3', files); actualizarBotones(); });
+$('b3').onclick = () => trabajar('i3', 'Actualizando…', async (info) => {
+  const csv = revisados.find(f => /\.csv$/i.test(f.name));
+  const xlsx = revisados.filter(f => /\.xlsx$/i.test(f.name));
+  const archivos = await leer(csv ? [...xlsx, csv] : xlsx);
+  const args = ['$rutas_xlsx', csv ? '/entrada/' + csv.name : null, Number($('umbral').value) / 100];
+  const r = await llamar('actualizar', args.map(a => a === '$rutas_xlsx' ? xlsx.map(f => '/entrada/' + f.name) : a), archivos);
+  info.className = 'info ok';
+  info.textContent = `✔ Listo. Descarga los Excel rehechos y el historico.csv nuevo (reemplaza el del disco compartido).`;
+  descargas('d3', r.salidas);
+  $('b3r').hidden = false;
+});
+$('b3r').onclick = () => trabajar('i3', 'Reentrenando el modelo… (unos minutos)', async (info) => {
+  const r = await llamar('reentrenar', []);
+  await modeloEntrenado(r, info);
+  descargas('d3', r.salidas);
+  $('i1').className = 'info ok'; $('i1').textContent = info.textContent;
+});
+
+// ---------- arranque ----------
+actualizarBotones();
+leerCache().then(c => {
+  if (c && c.meta) {
+    $('cacheFila').hidden = false;
+    $('cacheInfo').textContent = `Entrenado el ${new Date(c.meta.fecha).toLocaleString('es-PE')} con ${c.meta.movimientos.toLocaleString('es-PE')} movimientos.`;
+  }
+});
+const t0 = Date.now();
+llamar('iniciar', { fuentes: FUENTES }).then(() => {
+  motorListo = true; $('punto').className = 'punto listo';
+  $('estadoMotor').textContent = `Motor listo (${Math.round((Date.now() - t0) / 1000)} s).`;
+  log('Motor listo.'); actualizarBotones();
+}).catch(e => {
+  $('punto').className = 'punto error';
+  $('estadoMotor').textContent = 'No se pudo cargar el motor: ' + e.message + ' (¿hay conexión a internet?)';
+});
+</script>
+</body>
+</html>

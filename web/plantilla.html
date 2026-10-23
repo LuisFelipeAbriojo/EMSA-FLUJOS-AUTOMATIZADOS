@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificador de Flujos</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #5f6b7a; --line: #dde1e7;
+    --accent: #1f5fbf; --accent-soft: #e6eefb; --ok: #1e7b4c; --ok-soft: #e3f4ea;
+    --warn: #8a5a00; --warn-soft: #fff2cc; --bad: #b42318; --bad-soft: #fde7e5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --card: #1b2029; --text: #e7eaf0; --muted: #9aa5b4; --line: #2c3340;
+      --accent: #6ea2ff; --accent-soft: #1d2a42; --ok: #5fd39a; --ok-soft: #173326;
+      --warn: #ffcf66; --warn-soft: #3a2f12; --bad: #ff8a80; --bad-soft: #3d1c1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .privado { background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: 10px 14px;
+             margin-bottom: 16px; font-size: 14px; }
+  .motor { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+  .punto { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
+  .punto.listo { background: var(--ok); }
+  .punto.error { background: var(--bad); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  section.bloqueado { opacity: .5; pointer-events: none; }
+  .cab { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+         display: grid; place-items: center; font-weight: 600; flex: none; }
+  section.hecho .num { background: var(--ok-soft); color: var(--ok); }
+  p.ayuda { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  .zona { border: 2px dashed var(--line); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer;
+          color: var(--muted); transition: border-color .15s, background .15s; }
+  .zona:hover, .zona.sobre { border-color: var(--accent); background: var(--accent-soft); }
+  .zona input { display: none; }
+  .lista { margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
+  .lista li { padding: 2px 0; overflow-wrap: anywhere; }
+  .fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 12px; }
+  label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  input[type=month], input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+          background: var(--card); color: var(--text); }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer;
+           background: var(--accent); color: #fff; }
+  button.sec { background: var(--accent-soft); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .info { margin-top: 12px; font-size: 14px; }
+  .info.ok { color: var(--ok); }
+  .info.err { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad { background: var(--bad-soft); color: var(--bad); }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .tabla { overflow-x: auto; }
+  a.desc { color: var(--accent); font-weight: 600; text-decoration: none; }
+  a.desc:hover { text-decoration: underline; }
+  .descargas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .descargas a { background: var(--accent-soft); padding: 7px 12px; border-radius: 8px; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre#log { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px;
+            max-height: 260px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+  .girando { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
+             border-radius: 50%; animation: g 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes g { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clasificador de flujos de caja</h1>
+  <p class="sub">Clasifica los movimientos del mes desde los libros bancos y arma el Excel por empresa.</p>
+  <div class="privado">🔒 Tus archivos no salen de esta computadora. Todo se procesa dentro del navegador;
+    internet solo se usa para descargar el motor la primera vez.</div>
+  <div class="motor"><span class="punto" id="punto"></span><span id="estadoMotor">Preparando el motor (Python en el navegador)… la primera vez tarda unos segundos.</span></div>
+
+  <section id="s1">
+    <div class="cab"><span class="num">1</span><h2>Modelo</h2></div>
+    <p class="ayuda">Carga <b>historico.csv</b> (entrena el modelo, unos minutos) o <b>modelo_web.pkl</b> si ya lo entrenaste antes (instantáneo).
+      Los dos están en el disco compartido.</p>
+    <div class="zona" data-input="f1"><input type="file" id="f1" accept=".csv,.pkl">Arrastra aquí el archivo o haz clic para elegirlo</div>
+    <div class="fila" id="cacheFila" hidden><button class="sec" id="usarCache">Usar el modelo guardado en este navegador</button><span class="ayuda" id="cacheInfo"></span></div>
+    <div class="info" id="i1"></div>
+    <div class="descargas" id="d1"></div>
+  </section>
+
+  <section id="s2" class="bloqueado">
+    <div class="cab"><span class="num">2</span><h2>Libros bancos del mes</h2></div>
+    <p class="ayuda">Un .xlsx por empresa (por ejemplo <i>ICP OCT 2026.xlsx</i>). El nombre del archivo debe incluir la empresa.</p>
+    <div class="zona" data-input="f2"><input type="file" id="f2" accept=".xlsx" multiple>Arrastra aquí los libros o haz clic para elegirlos</div>
+    <ul class="lista" id="l2"></ul>
+    <div class="fila">
+      <label>Mes a procesar<input type="month" id="mes"></label>
+      <label>Revisar si la confianza es menor a (%)<input type="number" id="umbral" min="50" max="100" step="1" value="90"></label>
+      <button id="b2" disabled>Clasificar</button>
+    </div>
+    <div class="info" id="i2"></div>
+    <div class="tabla" id="t2"></div>
+    <div class="descargas" id="d2"></div>
+  </section>
+
+  <section id="s3" class="bloqueado">
+    <div class="cab"><span class="num">3</span><h2>Después de revisar (opcional)</h2></div>
+    <p class="ayuda">Sube los Excel <b>CLASIFICADO</b> ya corregidos en la hoja MOVIMIENTOS. Se rehacen las hojas por cuenta y
+      se agrega el mes al histórico para que el modelo aprenda. Si cargaste un .pkl en el paso 1, incluye también <b>historico.csv</b>.</p>
+    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel revisados</div>
+    <ul class="lista" id="l3"></ul>
+    <div class="fila"><button id="b3" disabled>Actualizar</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
+    <div class="info" id="i3"></div>
+    <div class="descargas" id="d3"></div>
+  </section>
+
+  <details><summary>Detalle del proceso</summary><pre id="log"></pre></details>
+</main>
+
+<script id="codigoWorker" type="text/plain">
+importScripts('https://cdn.jsdelivr.net/pyodide/v__PYODIDE__/full/pyodide.js');
+let py;
+const avisar = (t) => postMessage({ tipo: 'log', texto: String(t) });
+self.avisar = avisar;
+async function iniciar(fuentes) {
+  py = await loadPyodide();
+  avisar('Cargando pandas, scikit-learn y openpyxl…');
+  await py.loadPackage(['pandas', 'scikit-learn', 'scipy', 'micropip'], { messageCallback: () => {} });
+  await py.runPythonAsync("import micropip; await micropip.install('openpyxl')");
+  py.FS.mkdirTree('/app'); py.FS.mkdirTree('/entrada'); py.FS.mkdirTree('/salida');
+  for (const [nombre, codigo] of Object.entries(fuentes)) py.FS.writeFile('/app/' + nombre, codigo);
+  py.runPython("import sys; sys.path.insert(0, '/app'); import app_web");
+}
+function escribir(archivos) {
+  for (const n of py.FS.readdir('/entrada')) if (n !== '.' && n !== '..') py.FS.unlink('/entrada/' + n);
+  return archivos.map(a => { const r = '/entrada/' + a.nombre; py.FS.writeFile(r, new Uint8Array(a.bytes)); return r; });
+}
+function salidas() {
+  return py.FS.readdir('/salida').filter(n => n !== '.' && n !== '..')
+    .map(n => ({ nombre: n, bytes: py.FS.readFile('/salida/' + n).buffer }));
+}
+onmessage = async (ev) => {
+  const { id, accion, archivos, args } = ev.data;
+  try {
+    if (accion === 'iniciar') { await iniciar(args.fuentes); postMessage({ id, ok: true }); return; }
+    const rutas = escribir(archivos || []);
+    const f = py.globals.get('app_web')[accion];
+    const res = f(...args.map(x => x === '$rutas' ? py.toPy(rutas) : x === '$ruta' ? rutas[0] : Array.isArray(x) ? py.toPy(x) : x), avisar);
+    const valor = res && res.toJs ? res.toJs({ dict_converter: Object.fromEntries }) : res;
+    const sal = salidas();
+    postMessage({ id, ok: true, valor, salidas: sal }, sal.map(s => s.bytes));
+  } catch (e) {
+    postMessage({ id, ok: false, error: String(e.message || e) });
+  }
+};
+</script>
+
+<script>
+const FUENTES = /*__FUENTES__*/;
+const $ = (id) => document.getElementById(id);
+const log = (t) => { $('log').textContent += t + '\n'; $('log').scrollTop = 1e9; };
+
+// ---------- motor (Python en un Web Worker para no congelar la página) ----------
+const worker = new Worker(URL.createObjectURL(new Blob([$('codigoWorker').textContent], { type: 'text/javascript' })));
+const pendientes = {};
+let sig = 0;
+worker.onmessage = (ev) => {
+  const m = ev.data;
+  if (m.tipo === 'log') { log(m.texto); return; }
+  const p = pendientes[m.id]; delete pendientes[m.id];
+  m.ok ? p.ok(m) : p.mal(new Error(m.error));
+};
+function llamar(accion, args, archivos = []) {
+  const id = ++sig;
+  return new Promise((ok, mal) => { pendientes[id] = { ok, mal }; worker.postMessage({ id, accion, args, archivos }); });
+}
+async function leer(files) {
+  return Promise.all([...files].map(async f => ({ nombre: f.name, bytes: await f.arrayBuffer() })));
+}
+
+// ---------- utilidades de interfaz ----------
+let ocupado = false;
+async function trabajar(infoId, texto, fn) {
+  if (ocupado) return;
+  ocupado = true; actualizarBotones();
+  const t0 = Date.now(), info = $(infoId);
+  info.className = 'info';
+  const reloj = setInterval(() => { info.innerHTML = `<span class="girando"></span>${texto} (${Math.round((Date.now() - t0) / 1000)} s)`; }, 500);
+  info.innerHTML = `<span class="girando"></span>${texto}`;
+  try { await fn(info); }
+  catch (e) { info.className = 'info err'; info.textContent = 'Error: ' + e.message; log('ERROR: ' + e.message); }
+  finally { clearInterval(reloj); ocupado = false; actualizarBotones(); }
+}
+function descargas(contenedor, salidas, filtro = () => true) {
+  const d = $(contenedor); d.innerHTML = '';
+  for (const s of salidas.filter(filtro)) {
+    const a = document.createElement('a');
+    a.className = 'desc'; a.textContent = '⬇ ' + s.nombre; a.download = s.nombre;
+    a.href = URL.createObjectURL(new Blob([s.bytes]));
+    d.appendChild(a);
+  }
+}
+function zona(inputId, alCambiar) {
+  const inp = $(inputId), z = inp.parentElement;
+  z.addEventListener('click', () => inp.click());
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('sobre'); });
+  z.addEventListener('dragleave', () => z.classList.remove('sobre'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('sobre'); alCambiar([...e.dataTransfer.files]); });
+  inp.addEventListener('change', () => { alCambiar([...inp.files]); inp.value = ''; });
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
+
+let motorListo = false, hayModelo = false, libros = [], revisados = [];
+function actualizarBotones() {
+  $('s2').classList.toggle('bloqueado', !hayModelo);
+  $('s3').classList.toggle('bloqueado', !hayModelo);
+  $('b2').disabled = ocupado || !libros.length;
+  $('b3').disabled = ocupado || !revisados.some(f => /\.xlsx$/i.test(f.name));
+  $('b3r').disabled = ocupado;
+  $('usarCache').disabled = ocupado || !motorListo;
+}
+
+// ---------- guardar el modelo entrenado en este navegador (comodidad; si falla no pasa nada) ----------
+const DB = 'clasificador-flujos';
+function idb(modo, fn) {
+  return new Promise((ok, mal) => {
+    try {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { const tx = r.result.transaction('kv', modo); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => ok(q && q.result); tx.onerror = () => mal(tx.error); };
+      r.onerror = () => mal(r.error);
+    } catch (e) { mal(e); }
+  });
+}
+const guardarCache = (bytes, meta) => idb('readwrite', s => s.put({ bytes, meta }, 'modelo')).catch(() => {});
+const leerCache = () => idb('readonly', s => s.get('modelo')).catch(() => null);
+
+function mostrarModelo(info, m) {
+  info.className = 'info ok';
+  info.innerHTML = `✔ Modelo listo: ${m.movimientos.toLocaleString('es-PE')} movimientos de entrenamiento, ` +
+    `${m.categorias} categorías, empresas: ${m.empresas.join(', ')}` + (m.meses.length ? ` · meses: ${m.meses.join(', ')}` : '');
+  hayModelo = true; $('s1').classList.add('hecho'); actualizarBotones();
+}
+async function modeloEntrenado(r, info) {
+  mostrarModelo(info, r.valor);
+  const pkl = r.salidas.find(s => s.nombre === 'modelo_web.pkl');
+  if (pkl) {
+    await guardarCache(pkl.bytes.slice(0), { fecha: new Date().toISOString(), ...r.valor });
+    descargas('d1', r.salidas);
+  }
+}
+
+// ---------- paso 1 ----------
+zona('f1', async (files) => {
+  const f = files[0]; if (!f || !motorListo) return;
+  $('d1').innerHTML = '';
+  if (/\.pkl$/i.test(f.name)) {
+    await trabajar('i1', 'Cargando el modelo…', async (info) => {
+      const r = await llamar('cargar_modelo', ['$ruta'], await leer([f]));
+      mostrarModelo(info, r.valor);
+    });
+  } else {
+    await trabajar('i1', 'Entrenando el modelo con el histórico… (unos minutos, puedes dejar la pestaña abierta)', async (info) => {
+      const r = await llamar('cargar_historico', ['$ruta'], await leer([f]));
+      await modeloEntrenado(r, info);
+      $('d1').insertAdjacentHTML('afterbegin', '<span class="ayuda">Guarda este archivo en el disco compartido para no volver a entrenar:</span>');
+    });
+  }
+});
+$('usarCache').onclick = async () => {
+  const c = await leerCache(); if (!c) return;
+  await trabajar('i1', 'Cargando el modelo guardado…', async (info) => {
+    const r = await llamar('cargar_modelo', ['$ruta'], [{ nombre: 'modelo_web.pkl', bytes: c.bytes }]);
+    mostrarModelo(info, { ...r.valor, meses: c.meta.meses || [] });
+  });
+};
+
+// ---------- paso 2 ----------
+(function () {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  $('mes').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+zona('f2', (files) => {
+  libros = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('l2', libros); actualizarBotones();
+});
+$('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
+  const [anio, mes] = $('mes').value.split('-').map(Number);
+  const umbral = Number($('umbral').value) / 100;
+  $('t2').innerHTML = ''; $('d2').innerHTML = '';
+  const r = await llamar('clasificar', ['$rutas', anio, mes, umbral], await leer(libros));
+  const hechos = r.valor;
+  if (!hechos.length) { info.className = 'info err'; info.textContent = 'No salió ningún archivo: revisa el mes elegido y los nombres de los libros (ver detalle).'; return; }
+  const tot = hechos.reduce((a, h) => a + h.movimientos, 0), rev = hechos.reduce((a, h) => a + h.revisar, 0);
+  info.className = 'info ok';
+  info.textContent = `✔ ${tot.toLocaleString('es-PE')} movimientos clasificados en ${hechos.length} empresas · ${rev} para revisar (filas amarillas).`;
+  const urls = Object.fromEntries(r.salidas.map(s => [s.nombre, URL.createObjectURL(new Blob([s.bytes]))]));
+  $('t2').innerHTML = '<table><tr><th>Empresa</th><th class="n">Movimientos</th><th class="n">Cuentas</th><th>Revisar</th><th>Saldos</th><th></th></tr>' +
+    hechos.map(h => `<tr><td><b>${esc(h.empresa)}</b></td><td class="n">${h.movimientos.toLocaleString('es-PE')}</td><td class="n">${h.cuentas}</td>
+      <td><span class="chip ${h.revisar ? 'warn' : 'ok'}">${h.revisar}</span></td>
+      <td>${h.descuadres ? `<span class="chip bad">${h.descuadres} no cuadra${h.descuadres > 1 ? 'n' : ''}</span>` : '<span class="chip ok">cuadran</span>'}</td>
+      <td><a class="desc" href="${urls[h.archivo]}" download="${esc(h.archivo)}">⬇ Excel</a></td></tr>`).join('') + '</table>';
+  descargas('d2', r.salidas, s => s.nombre.endsWith('.zip'));
+});
+
+// ---------- paso 3 ----------
+zona('f3', (files) => { revisados = files; lista('l3', files); actualizarBotones(); });
+$('b3').onclick = () => trabajar('i3', 'Actualizando…', async (info) => {
+  const csv = revisados.find(f => /\.csv$/i.test(f.name));
+  const xlsx = revisados.filter(f => /\.xlsx$/i.test(f.name));
+  const archivos = await leer(csv ? [...xlsx, csv] : xlsx);
+  const args = ['$rutas_xlsx', csv ? '/entrada/' + csv.name : null, Number($('umbral').value) / 100];
+  const r = await llamar('actualizar', args.map(a => a === '$rutas_xlsx' ? xlsx.map(f => '/entrada/' + f.name) : a), archivos);
+  info.className = 'info ok';
+  info.textContent = `✔ Listo. Descarga los Excel rehechos y el historico.csv nuevo (reemplaza el del disco compartido).`;
+  descargas('d3', r.salidas);
+  $('b3r').hidden = false;
+});
+$('b3r').onclick = () => trabajar('i3', 'Reentrenando el modelo… (unos minutos)', async (info) => {
+  const r = await llamar('reentrenar', []);
+  await modeloEntrenado(r, info);
+  descargas('d3', r.salidas);
+  $('i1').className = 'info ok'; $('i1').textContent = info.textContent;
+});
+
+// ---------- arranque ----------
+actualizarBotones();
+leerCache().then(c => {
+  if (c && c.meta) {
+    $('cacheFila').hidden = false;
+    $('cacheInfo').textContent = `Entrenado el ${new Date(c.meta.fecha).toLocaleString('es-PE')} con ${c.meta.movimientos.toLocaleString('es-PE')} movimientos.`;
+  }
+});
+const t0 = Date.now();
+llamar('iniciar', { fuentes: FUENTES }).then(() => {
+  motorListo = true; $('punto').className = 'punto listo';
+  $('estadoMotor').textContent = `Motor listo (${Math.round((Date.now() - t0) / 1000)} s).`;
+  log('Motor listo.'); actualizarBotones();
+}).catch(e => {
+  $('punto').className = 'punto error';
+  $('estadoMotor').textContent = 'No se pudo cargar el motor: ' + e.message + ' (¿hay conexión a internet?)';
+});
+</script>
+</body>
+</html>

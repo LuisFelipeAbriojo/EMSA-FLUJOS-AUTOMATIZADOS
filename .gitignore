@@ -1,0 +1,9 @@
+__pycache__/
+*.pkl
+historico*.csv
+LIBROS/
+SALIDA/
+*.xlsx
+~$*
+CONTEXTO.md
+.claude/
