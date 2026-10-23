@@ -111,12 +111,13 @@
   </section>
 
   <section id="s3" class="bloqueado">
-    <div class="cab"><span class="num">3</span><h2>Después de revisar (opcional)</h2></div>
-    <p class="ayuda">Sube los Excel <b>CLASIFICADO</b> ya corregidos en la hoja MOVIMIENTOS. Se rehacen las hojas por cuenta y
-      se agrega el mes al histórico para que el modelo aprenda. Si cargaste un .pkl en el paso 1, incluye también <b>historico.csv</b>.</p>
-    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel revisados</div>
+    <div class="cab"><span class="num">3</span><h2>Enseñarle al modelo (opcional, una vez al mes)</h2></div>
+    <p class="ayuda">¿Corregiste categorías en la hoja MOVIMIENTOS de algún Excel? Súbelo aquí. Las hojas por cuenta se rehacen
+      con tus cambios y el modelo aprende para no repetir el error el próximo mes.
+      Si en el paso 1 cargaste <b>modelo_web.pkl</b>, sube también <b>historico.csv</b>.</p>
+    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel corregidos</div>
     <ul class="lista" id="l3"></ul>
-    <div class="fila"><button id="b3" disabled>Actualizar</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
+    <div class="fila"><button id="b3" disabled>Aprender de mis correcciones</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
     <div class="info" id="i3"></div>
     <div class="descargas" id="d3"></div>
   </section>
