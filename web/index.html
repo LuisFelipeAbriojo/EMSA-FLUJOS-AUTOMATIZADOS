@@ -39,8 +39,24 @@
     <div class="descargas" id="d2"></div>
   </section>
 
+  <section id="sA">
+    <div class="cab"><span class="num">3</span><h2>Armar el flujo del mes</h2></div>
+    <p class="ayuda">Sube, por empresa, el Excel <b>CLASIFICADO</b> ya revisado y el <b>RESUMEN FLUJO del mes anterior</b>.
+      Sale el RESUMEN FLUJO del mes con su formato, y un archivo de <b>notas</b> con los controles y lo que conviene mirar.</p>
+    <div class="zona" data-input="fA"><input type="file" id="fA" accept=".xlsx" multiple>Arrastra aquí los Excel clasificados y los flujos del mes anterior</div>
+    <ul class="lista" id="lA"></ul>
+    <div class="fila">
+      <label>Mes a armar<input type="month" id="mesA"></label>
+      <label>TC de fin de mes (uno solo para todas)<input type="number" id="tcA" min="2" max="6" step="0.001" placeholder="3.437"></label>
+      <button id="bA" disabled>Armar flujo</button>
+    </div>
+    <div class="info" id="iA"></div>
+    <div class="tabla" id="tA"></div>
+    <div class="descargas" id="dA"></div>
+  </section>
+
   <section id="s3" class="bloqueado">
-    <div class="cab"><span class="num">3</span><h2>Enseñarle al modelo (opcional, una vez al mes)</h2></div>
+    <div class="cab"><span class="num">4</span><h2>Enseñarle al modelo (opcional, una vez al mes)</h2></div>
     <p class="ayuda">¿Corregiste categorías en la hoja MOVIMIENTOS de algún Excel? Súbelo aquí. Las hojas por cuenta se rehacen
       con tus cambios y el modelo aprende para no repetir el error el próximo mes.
       Si en el paso 1 cargaste <b>modelo_web.pkl</b>, sube también <b>historico.csv</b>.</p>

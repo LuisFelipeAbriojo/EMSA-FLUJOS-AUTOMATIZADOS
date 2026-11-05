@@ -91,3 +91,41 @@ patron = 'DOLARES|CAMBIO (DE )?MONEDA|\bCOMU\$|\bT\.?C\.? ?\d'
 [[transferencias.tipos]]
 nombre = "FONDOS MUTUOS"
 patron = 'FONDOS? MUTUOS?|RESCATE|\bF\.? ?MUTUO|CPDADM'
+
+# Filas de la hoja Over de cada empresa: los que salen a fin de mes y los que vuelven del mes anterior.
+[over.ECNA]
+columna_salen = "E"
+filas_salen = [11, 12]
+filas_vuelven = [8, 9]
+[over.ECSA]
+columna_salen = "D"
+filas_salen = [8, 9]
+filas_vuelven = [12, 13]
+[over.ELSA]
+columna_salen = "D"
+filas_salen = [7, 6, 8]
+filas_vuelven = [12, 11, 13]
+[over.ESSA]
+columna_salen = "E"
+filas_salen = [4, 5]
+filas_vuelven = [7, 8]
+[over.ICP]
+columna_salen = "D"
+filas_salen = [7, 8]
+filas_vuelven = [12, 13]
+[over.ONE]
+columna_salen = "E"
+filas_salen = [8, 9]
+filas_vuelven = [11, 12]
+[over.REVO]
+columna_salen = "E"
+filas_salen = [4, 5]
+filas_vuelven = [7, 8]
+[over.SBSA]
+columna_salen = "D"
+filas_salen = [10, 11, 12, 13, 14]
+filas_vuelven = [18, 19, 20, 21, 22]
+[over.T1]
+columna_salen = "E"
+filas_salen = [8, 9]
+filas_vuelven = [11, 12]

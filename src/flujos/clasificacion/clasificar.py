@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from flujos.lectura.libros import leer_empresa
+from flujos.lectura.libros import leer_con_overnights
 from flujos.lectura.normalizar import empresa_de
 from flujos.reportes.excel_clasificado import MESES, escribir
 
@@ -32,14 +32,14 @@ def clasificar(archivos: Iterable[str], anio: int, mes: int, modelo: Any, salida
         if not emp:
             log.warning('  ?  No reconozco la empresa en "%s", lo salto.', os.path.basename(f))
             continue
-        mov, cuentas = leer_empresa(f, anio, mes, emp)
+        mov, cuentas, overnights = leer_con_overnights(f, anio, mes, emp)
         if mov.empty:
             log.warning('  %-5s sin movimientos en %s %s', emp, MESES[mes], anio)
             continue
         pred = modelo.predict(mov)
         mov = pd.concat([mov.reset_index(drop=True), pred], axis=1)
         ruta = os.path.join(salida, f'{emp} FLUJO {MESES[mes]} {anio} CLASIFICADO.xlsx')
-        mov = escribir(ruta, emp, anio, mes, mov, cuentas, modelo, umbral)
+        mov = escribir(ruta, emp, anio, mes, mov, cuentas, modelo, umbral, overnights)
         descuadre = cuentas[
             (cuentas.saldo_inicial + cuentas.ingresos - cuentas.egresos - cuentas.saldo_final).abs() > 0.05]
         hechos.append(dict(empresa=emp, ruta=ruta, movimientos=len(mov), revisar=int(mov.revisar.sum()),

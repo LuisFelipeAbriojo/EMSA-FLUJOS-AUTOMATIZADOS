@@ -34,7 +34,7 @@ testpaths = ["tests"]
 filterwarnings = ["ignore::UserWarning:openpyxl"]
 
 [tool.ruff]
-line-length = 120
+line-length = 135
 target-version = "py311"
 src = ["src", "tests", "scripts"]
 

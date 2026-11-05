@@ -9,7 +9,7 @@ from typing import Any
 import openpyxl
 import pandas as pd
 
-from flujos.lectura.normalizar import banco, empresa_de, moneda, norm
+from flujos.lectura.normalizar import banco, empresa_de, es_overnight, moneda, norm
 
 COLS = ['FECHA', 'CONCEPTO', 'DEBE', 'HABER', 'SALDO']
 # ELSA llama de otra forma a la columna del concepto
@@ -65,11 +65,20 @@ def _num(v: Any) -> float | None:
 
 def leer_empresa(ruta: str, anio: int, mes: int, empresa: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Devuelve (movimientos DataFrame, cuentas DataFrame con saldos)."""
+    mov, cuentas, _ = leer_con_overnights(ruta, anio, mes, empresa)
+    return mov, cuentas
+
+
+def leer_con_overnights(ruta: str, anio: int, mes: int,
+                        empresa: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Como leer_empresa, y además los overnights de este mes y sus vecinos: los cargos y abonos pueden cruzar de mes."""
     empresa = empresa or empresa_de(PurePath(ruta).name)
     wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
     ini_mes = dt.date(anio, mes, 1)
     fin_mes = (dt.date(anio + (mes == 12), mes % 12 + 1, 1))
-    movs, cuentas = [], []
+    movs, cuentas, overnights = [], [], []
+    desde = dt.date(anio - (mes == 1), (mes - 2) % 12 + 1, 1)
+    hasta = dt.date(fin_mes.year + (fin_mes.month == 12), fin_mes.month % 12 + 1, 1)
     for ws in wb.worksheets:
         filas = list(ws.iter_rows(values_only=True))
         cab = None
@@ -135,6 +144,12 @@ def leer_empresa(ruta: str, anio: int, mes: int, empresa: str | None = None) -> 
         for item in fechadas:
             k, r, f, vac = item[:4]
             f_orig = item[4] if len(item) > 4 else None
+            if desde <= f < hasta and es_overnight(r[c['CONCEPTO']] or ''):
+                debe, haber = _num(r[c['DEBE']]), _num(r[c['HABER']])
+                for tipo, monto in (('INGRESO', debe), ('EGRESO', haber)):
+                    if monto and monto > 1:
+                        overnights.append(dict(hoja=ws.title, banco=banco(ws.title), moneda=mon, fecha=f,
+                                               concepto=str(r[c['CONCEPTO']]).strip(), tipo=tipo, monto=round(monto, 2)))
             if vac >= 3 and saldo_ini is not None:
                 suelto = True
             s = _num(r[c['SALDO']]) if 'SALDO' in c else None
@@ -175,4 +190,4 @@ def leer_empresa(ruta: str, anio: int, mes: int, empresa: str | None = None) -> 
         cuentas.append(dict(empresa=empresa, hoja=ws.title, cuenta=cuenta, banco=banco(ws.title), moneda=mon,
                             saldo_inicial=saldo_ini or 0.0, ingresos=round(deb, 2), egresos=round(hab, 2),
                             saldo_final=saldo_fin or 0.0, movimientos=n_mov, alertas=' | '.join(alertas)))
-    return pd.DataFrame(movs), pd.DataFrame(cuentas)
+    return pd.DataFrame(movs), pd.DataFrame(cuentas), pd.DataFrame(overnights)

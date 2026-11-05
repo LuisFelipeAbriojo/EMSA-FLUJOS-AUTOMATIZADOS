@@ -45,6 +45,13 @@ def moneda(hoja: str, cabecera: str = '') -> str:
     return 'USD' if banco(hoja) in cargar()['monedas']['bancos_en_dolares_por_defecto'] else 'PEN'
 
 
+_OVERNIGHT = re.compile(r'OV\w*N\w*G\w*T|OVERN')
+
+
+def es_overnight(concepto: Any) -> bool:
+    return bool(_OVERNIGHT.search(norm(concepto)))
+
+
 def categoria(seccion: str) -> str:
     """Unifica las variantes de escritura de una sección en un solo nombre."""
     s = norm(seccion)

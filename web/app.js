@@ -53,13 +53,15 @@ function zona(inputId, alCambiar) {
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
 
-let motorListo = false, hayModelo = false, libros = [], revisados = [];
+let motorListo = false, hayModelo = false, libros = [], revisados = [], archivosA = [];
 function actualizarBotones() {
   $('s2').classList.toggle('bloqueado', !hayModelo);
   $('s3').classList.toggle('bloqueado', !hayModelo);
   $('b2').disabled = ocupado || !libros.length;
   $('b3').disabled = ocupado || !revisados.some(f => /\.xlsx$/i.test(f.name));
   $('b3r').disabled = ocupado;
+  const tc = Number($('tcA').value);
+  $('bA').disabled = ocupado || !motorListo || !archivosA.length || !(tc > 2 && tc < 6);
   $('usarCache').disabled = ocupado || !motorListo;
 }
 
@@ -146,7 +148,39 @@ $('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
   descargas('d2', r.salidas, s => s.nombre.endsWith('.zip'));
 });
 
-// ---------- paso 3 ----------
+// ---------- armar el flujo ----------
+(function () {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  $('mesA').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+zona('fA', (files) => {
+  archivosA = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('lA', archivosA); actualizarBotones();
+});
+$('tcA').addEventListener('input', () => actualizarBotones());
+$('bA').onclick = () => trabajar('iA', 'Armando el flujo… puede tardar un par de minutos por empresa.', async (info) => {
+  const [anio, mes] = $('mesA').value.split('-').map(Number);
+  $('tA').innerHTML = ''; $('dA').innerHTML = '';
+  const r = await llamar('armar_flujos', ['$rutas', anio, mes, Number($('tcA').value)], await leer(archivosA));
+  const filas = r.valor;
+  const urls = Object.fromEntries(r.salidas.map(s => [s.nombre, URL.createObjectURL(new Blob([s.bytes]))]));
+  const buenos = filas.filter(h => !h.error);
+  const conErrores = buenos.filter(h => h.errores).length;
+  info.className = buenos.length && !conErrores && buenos.length === filas.length ? 'info ok' : 'info err';
+  info.textContent = !buenos.length ? 'No se armó ningún flujo: revisa los mensajes de la tabla.' :
+    `${buenos.length} flujos armados. ${conErrores ? conErrores + ' con controles sin pasar: mira sus notas antes de presentarlos.' : 'Todos pasaron los controles.'}`;
+  $('tA').innerHTML = '<table><tr><th>Empresa</th><th class="n">Movimientos</th><th>Controles</th><th>Avisos</th><th>Flujo</th><th>Notas</th></tr>' +
+    filas.map(h => h.error
+      ? `<tr><td><b>${esc(h.empresa)}</b></td><td colspan="5"><span class="chip bad">${esc(h.error)}</span></td></tr>`
+      : `<tr><td><b>${esc(h.empresa)}</b></td><td class="n">${h.movimientos.toLocaleString('es-PE')}</td>
+         <td>${h.errores ? `<span class="chip bad">${h.errores} sin pasar</span>` : '<span class="chip ok">OK</span>'}</td>
+         <td><span class="chip ${h.avisos ? 'warn' : 'ok'}">${h.avisos}</span></td>
+         <td><a class="desc" href="${urls[h.flujo]}" download="${esc(h.flujo)}">⬇ Flujo</a></td>
+         <td><a class="desc" href="${urls[h.notas]}" download="${esc(h.notas)}">⬇ Notas</a></td></tr>`).join('') + '</table>';
+  descargas('dA', r.salidas, s => s.nombre.endsWith('.zip'));
+});
+
+// ---------- paso 4 ----------
 zona('f3', (files) => { revisados = files; lista('l3', files); actualizarBotones(); });
 $('b3').onclick = () => trabajar('i3', 'Actualizando…', async (info) => {
   const csv = revisados.find(f => /\.csv$/i.test(f.name));

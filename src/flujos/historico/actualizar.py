@@ -52,7 +52,8 @@ def actualizar(archivos: Iterable[str], h: pd.DataFrame, modelo: Any, umbral: fl
             itf_misma_fila=mv.NOTA.fillna('').str.contains('misma fila').astype(int), concepto_padre=''))
         # lo que el equipo revisó ya no está "por revisar"
         mov.loc[mov.confianza < umbral, ['confianza', 'origen']] = [1.0, 'revisado']
-        escribir(f, emp, anio, mes, mov, cuentas, modelo, umbral)
+        overnights = pd.read_excel(f, sheet_name='OVERNIGHTS') if 'OVERNIGHTS' in wb.sheetnames else None
+        escribir(f, emp, anio, mes, mov, cuentas, modelo, umbral, overnights)
         nuevos.append(pd.DataFrame(dict(
             itf_misma_fila=mov.itf_misma_fila, empresa=emp, periodo=f'{anio}-{mes:02d}', hoja=mov.hoja,
             banco=mov.hoja.map(banco), moneda=mov.moneda, fecha=mov.fecha.astype(str), concepto=mov.concepto,

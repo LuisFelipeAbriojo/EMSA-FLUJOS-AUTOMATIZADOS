@@ -37,7 +37,7 @@ def test_igual_a_la_linea_base(resultado):
     for ruta in glob.glob(os.path.join(base, '*.xlsx')):
         a = openpyxl.load_workbook(ruta)
         b = openpyxl.load_workbook(os.path.join(salida, os.path.basename(ruta)))
-        assert a.sheetnames == b.sheetnames
+        assert [x for x in b.sheetnames if x != 'OVERNIGHTS'] == a.sheetnames
         for s in a.sheetnames:
             for fa, fb in zip(a[s].iter_rows(values_only=True), b[s].iter_rows(values_only=True), strict=True):
                 if s == 'RESUMEN' and isinstance(fa[0], str) and fa[0].startswith('Generado'):

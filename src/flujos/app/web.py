@@ -16,10 +16,12 @@ from typing import Any
 
 import pandas as pd
 
+from flujos.armado.proceso import armar_flujo
 from flujos.clasificacion.clasificar import clasificar as _clasificar
 from flujos.clasificacion.entrenar import entrenar
 from flujos.clasificacion.modelo import Clasificador, cargar_modelo, guardar_modelo
 from flujos.historico.actualizar import actualizar as _actualizar
+from flujos.lectura.normalizar import empresa_de
 
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
@@ -118,6 +120,43 @@ def actualizar(rutas: Iterable[str], ruta_historico: str | None, umbral: float, 
     HIST.to_csv(f'{SALIDA}/historico.csv', index=False)
     avisar(f'Histórico actualizado: {len(HIST):,} movimientos.')
     return dict(movimientos=len(HIST))
+
+
+def armar_flujos(rutas: Iterable[str], anio: int, mes: int, tc: float, avisar: Aviso) -> list[dict[str, Any]]:
+    """Empareja por empresa cada Excel clasificado con su flujo del mes anterior y arma el flujo del mes."""
+    _vaciar_salida()
+    clasificados, anteriores = {}, {}
+    for r in rutas:
+        nombre = os.path.basename(r)
+        empresa = empresa_de(nombre)
+        if empresa is None:
+            avisar(f'No reconozco la empresa en "{nombre}", lo salto.')
+        elif 'CLASIFICADO' in nombre.upper():
+            clasificados[empresa] = r
+        else:
+            anteriores[empresa] = r
+    salida = []
+    with _con_avisos(avisar):
+        for empresa, clasificado in sorted(clasificados.items()):
+            anterior = anteriores.get(empresa)
+            if anterior is None:
+                salida.append(dict(empresa=empresa, error=f'Falta el RESUMEN FLUJO del mes anterior de {empresa}.'))
+                continue
+            try:
+                a = armar_flujo(clasificado, anterior, empresa, int(anio), int(mes), float(tc), SALIDA)
+            except ValueError as e:
+                salida.append(dict(empresa=empresa, error=str(e)))
+                continue
+            salida.append(dict(empresa=empresa, flujo=os.path.basename(a.flujo), notas=os.path.basename(a.notas),
+                               errores=a.errores, avisos=a.avisos, movimientos=a.movimientos, sin_seccion=a.sin_seccion))
+    for empresa in sorted(set(anteriores) - set(clasificados)):
+        salida.append(dict(empresa=empresa, error=f'Falta el Excel clasificado de {empresa}.'))
+    archivos = [x for x in os.listdir(SALIDA) if x.endswith('.xlsx')]
+    if len(archivos) > 2:
+        with zipfile.ZipFile(f'{SALIDA}/FLUJOS {anio}-{int(mes):02d}.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+            for x in archivos:
+                z.write(f'{SALIDA}/{x}', x)
+    return salida
 
 
 def reentrenar(avisar: Aviso) -> dict[str, Any]:

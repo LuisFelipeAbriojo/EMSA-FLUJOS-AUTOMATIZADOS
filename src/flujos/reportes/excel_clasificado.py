@@ -34,7 +34,7 @@ def secciones(mov: pd.DataFrame, modelo: Any, empresa: str) -> list[tuple[str, s
 
 
 def escribir(ruta: str, empresa: str, anio: int, mes: int, mov: pd.DataFrame, cuentas: pd.DataFrame, modelo: Any,
-             umbral: float) -> pd.DataFrame:
+             umbral: float, overnights: pd.DataFrame | None = None) -> pd.DataFrame:
     """Escribe el Excel de la empresa y devuelve los movimientos con revisar y tipo_seccion."""
     mov = mov.copy()
     # el ITF que la empresa deja dentro del movimiento va en la misma sección que la otra parte de la fila
@@ -219,5 +219,12 @@ def escribir(ruta: str, empresa: str, anio: int, mes: int, mov: pd.DataFrame, cu
         wc.column_dimensions['G'].width = 14
         wc.freeze_panes = 'A8'
     wb.move_sheet('MOVIMIENTOS', offset=-(len(wb.sheetnames) - 2))
+    if overnights is not None and not overnights.empty:
+        # el armado los necesita: el cargo de un overnight puede estar en otro mes
+        wo = wb.create_sheet('OVERNIGHTS')
+        wo.append(list(overnights.columns))
+        for fila in overnights.itertuples(index=False):
+            wo.append(list(fila))
+        wo.sheet_state = 'hidden'
     wb.save(ruta)
     return mov
