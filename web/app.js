@@ -1,0 +1,185 @@
+const WHEELS = /*__WHEELS__*/;
+const $ = (id) => document.getElementById(id);
+const log = (t) => { $('log').textContent += t + '\n'; $('log').scrollTop = 1e9; };
+
+// ---------- motor (Python en un Web Worker para no congelar la página) ----------
+const worker = new Worker(URL.createObjectURL(new Blob([$('codigoWorker').textContent], { type: 'text/javascript' })));
+const pendientes = {};
+let sig = 0;
+worker.onmessage = (ev) => {
+  const m = ev.data;
+  if (m.tipo === 'log') { log(m.texto); return; }
+  const p = pendientes[m.id]; delete pendientes[m.id];
+  m.ok ? p.ok(m) : p.mal(new Error(m.error));
+};
+function llamar(accion, args, archivos = []) {
+  const id = ++sig;
+  return new Promise((ok, mal) => { pendientes[id] = { ok, mal }; worker.postMessage({ id, accion, args, archivos }); });
+}
+async function leer(files) {
+  return Promise.all([...files].map(async f => ({ nombre: f.name, bytes: await f.arrayBuffer() })));
+}
+
+// ---------- utilidades de interfaz ----------
+let ocupado = false;
+async function trabajar(infoId, texto, fn) {
+  if (ocupado) return;
+  ocupado = true; actualizarBotones();
+  const t0 = Date.now(), info = $(infoId);
+  info.className = 'info';
+  const reloj = setInterval(() => { info.innerHTML = `<span class="girando"></span>${texto} (${Math.round((Date.now() - t0) / 1000)} s)`; }, 500);
+  info.innerHTML = `<span class="girando"></span>${texto}`;
+  try { await fn(info); }
+  catch (e) { info.className = 'info err'; info.textContent = 'Error: ' + e.message; log('ERROR: ' + e.message); }
+  finally { clearInterval(reloj); ocupado = false; actualizarBotones(); }
+}
+function descargas(contenedor, salidas, filtro = () => true) {
+  const d = $(contenedor); d.innerHTML = '';
+  for (const s of salidas.filter(filtro)) {
+    const a = document.createElement('a');
+    a.className = 'desc'; a.textContent = '⬇ ' + s.nombre; a.download = s.nombre;
+    a.href = URL.createObjectURL(new Blob([s.bytes]));
+    d.appendChild(a);
+  }
+}
+function zona(inputId, alCambiar) {
+  const inp = $(inputId), z = inp.parentElement;
+  z.addEventListener('click', () => inp.click());
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('sobre'); });
+  z.addEventListener('dragleave', () => z.classList.remove('sobre'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('sobre'); alCambiar([...e.dataTransfer.files]); });
+  inp.addEventListener('change', () => { alCambiar([...inp.files]); inp.value = ''; });
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
+
+let motorListo = false, hayModelo = false, libros = [], revisados = [];
+function actualizarBotones() {
+  $('s2').classList.toggle('bloqueado', !hayModelo);
+  $('s3').classList.toggle('bloqueado', !hayModelo);
+  $('b2').disabled = ocupado || !libros.length;
+  $('b3').disabled = ocupado || !revisados.some(f => /\.xlsx$/i.test(f.name));
+  $('b3r').disabled = ocupado;
+  $('usarCache').disabled = ocupado || !motorListo;
+}
+
+// ---------- guardar el modelo entrenado en este navegador (comodidad; si falla no pasa nada) ----------
+const DB = 'clasificador-flujos';
+function idb(modo, fn) {
+  return new Promise((ok, mal) => {
+    try {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { const tx = r.result.transaction('kv', modo); const q = fn(tx.objectStore('kv')); tx.oncomplete = () => ok(q && q.result); tx.onerror = () => mal(tx.error); };
+      r.onerror = () => mal(r.error);
+    } catch (e) { mal(e); }
+  });
+}
+const guardarCache = (bytes, meta) => idb('readwrite', s => s.put({ bytes, meta }, 'modelo')).catch(() => {});
+const leerCache = () => idb('readonly', s => s.get('modelo')).catch(() => null);
+
+function mostrarModelo(info, m) {
+  info.className = 'info ok';
+  info.innerHTML = `✔ Modelo listo: ${m.movimientos.toLocaleString('es-PE')} movimientos de entrenamiento, ` +
+    `${m.categorias} categorías, empresas: ${m.empresas.join(', ')}` + (m.meses.length ? ` · meses: ${m.meses.join(', ')}` : '');
+  hayModelo = true; $('s1').classList.add('hecho'); actualizarBotones();
+}
+async function modeloEntrenado(r, info) {
+  mostrarModelo(info, r.valor);
+  const pkl = r.salidas.find(s => s.nombre === 'modelo_web.pkl');
+  if (pkl) {
+    await guardarCache(pkl.bytes.slice(0), { fecha: new Date().toISOString(), ...r.valor });
+    descargas('d1', r.salidas);
+  }
+}
+
+// ---------- paso 1 ----------
+zona('f1', async (files) => {
+  const f = files[0]; if (!f || !motorListo) return;
+  $('d1').innerHTML = '';
+  if (/\.pkl$/i.test(f.name)) {
+    await trabajar('i1', 'Cargando el modelo…', async (info) => {
+      const r = await llamar('cargar_modelo_web', ['$ruta'], await leer([f]));
+      mostrarModelo(info, r.valor);
+    });
+  } else {
+    await trabajar('i1', 'Entrenando el modelo con el histórico… (unos minutos, puedes dejar la pestaña abierta)', async (info) => {
+      const r = await llamar('cargar_historico', ['$ruta'], await leer([f]));
+      await modeloEntrenado(r, info);
+      $('d1').insertAdjacentHTML('afterbegin', '<span class="ayuda">Guarda este archivo en el disco compartido para no volver a entrenar:</span>');
+    });
+  }
+});
+$('usarCache').onclick = async () => {
+  const c = await leerCache(); if (!c) return;
+  await trabajar('i1', 'Cargando el modelo guardado…', async (info) => {
+    const r = await llamar('cargar_modelo_web', ['$ruta'], [{ nombre: 'modelo_web.pkl', bytes: c.bytes }]);
+    mostrarModelo(info, { ...r.valor, meses: c.meta.meses || [] });
+  });
+};
+
+// ---------- paso 2 ----------
+(function () {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+  $('mes').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+zona('f2', (files) => {
+  libros = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('l2', libros); actualizarBotones();
+});
+$('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
+  const [anio, mes] = $('mes').value.split('-').map(Number);
+  const umbral = Number($('umbral').value) / 100;
+  $('t2').innerHTML = ''; $('d2').innerHTML = '';
+  const r = await llamar('clasificar', ['$rutas', anio, mes, umbral], await leer(libros));
+  const hechos = r.valor;
+  if (!hechos.length) { info.className = 'info err'; info.textContent = 'No salió ningún archivo: revisa el mes elegido y los nombres de los libros (ver detalle).'; return; }
+  const tot = hechos.reduce((a, h) => a + h.movimientos, 0), rev = hechos.reduce((a, h) => a + h.revisar, 0);
+  info.className = 'info ok';
+  info.textContent = `✔ ${tot.toLocaleString('es-PE')} movimientos clasificados en ${hechos.length} empresas · ${rev} para revisar (filas amarillas).`;
+  const urls = Object.fromEntries(r.salidas.map(s => [s.nombre, URL.createObjectURL(new Blob([s.bytes]))]));
+  $('t2').innerHTML = '<table><tr><th>Empresa</th><th class="n">Movimientos</th><th class="n">Cuentas</th><th>Revisar</th><th>Saldos</th><th></th></tr>' +
+    hechos.map(h => `<tr><td><b>${esc(h.empresa)}</b></td><td class="n">${h.movimientos.toLocaleString('es-PE')}</td><td class="n">${h.cuentas}</td>
+      <td><span class="chip ${h.revisar ? 'warn' : 'ok'}">${h.revisar}</span></td>
+      <td>${h.descuadres ? `<span class="chip bad">${h.descuadres} no cuadra${h.descuadres > 1 ? 'n' : ''}</span>` : '<span class="chip ok">cuadran</span>'}</td>
+      <td><a class="desc" href="${urls[h.archivo]}" download="${esc(h.archivo)}">⬇ Excel</a></td></tr>`).join('') + '</table>';
+  descargas('d2', r.salidas, s => s.nombre.endsWith('.zip'));
+});
+
+// ---------- paso 3 ----------
+zona('f3', (files) => { revisados = files; lista('l3', files); actualizarBotones(); });
+$('b3').onclick = () => trabajar('i3', 'Actualizando…', async (info) => {
+  const csv = revisados.find(f => /\.csv$/i.test(f.name));
+  const xlsx = revisados.filter(f => /\.xlsx$/i.test(f.name));
+  const archivos = await leer(csv ? [...xlsx, csv] : xlsx);
+  const args = ['$rutas_xlsx', csv ? '/entrada/' + csv.name : null, Number($('umbral').value) / 100];
+  const r = await llamar('actualizar', args.map(a => a === '$rutas_xlsx' ? xlsx.map(f => '/entrada/' + f.name) : a), archivos);
+  info.className = 'info ok';
+  info.textContent = `✔ Listo. Descarga los Excel rehechos y el historico.csv nuevo (reemplaza el del disco compartido).`;
+  descargas('d3', r.salidas);
+  $('b3r').hidden = false;
+});
+$('b3r').onclick = () => trabajar('i3', 'Reentrenando el modelo… (unos minutos)', async (info) => {
+  const r = await llamar('reentrenar', []);
+  await modeloEntrenado(r, info);
+  descargas('d3', r.salidas);
+  $('i1').className = 'info ok'; $('i1').textContent = info.textContent;
+});
+
+// ---------- arranque ----------
+actualizarBotones();
+leerCache().then(c => {
+  if (c && c.meta) {
+    $('cacheFila').hidden = false;
+    $('cacheInfo').textContent = `Entrenado el ${new Date(c.meta.fecha).toLocaleString('es-PE')} con ${c.meta.movimientos.toLocaleString('es-PE')} movimientos.`;
+  }
+});
+const t0 = Date.now();
+llamar('iniciar', { wheels: WHEELS }).then(() => {
+  motorListo = true; $('punto').className = 'punto listo';
+  $('estadoMotor').textContent = `Motor listo (${Math.round((Date.now() - t0) / 1000)} s).`;
+  log('Motor listo.'); actualizarBotones();
+}).catch(e => {
+  $('punto').className = 'punto error';
+  $('estadoMotor').textContent = 'No se pudo cargar el motor: ' + e.message + ' (¿hay conexión a internet?)';
+});

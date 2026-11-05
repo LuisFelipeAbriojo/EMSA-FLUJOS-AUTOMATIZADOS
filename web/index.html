@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificador de Flujos</title>
+<style>/*__ESTILOS__*/</style>
+</head>
+<body>
+<main>
+  <h1>Clasificador de flujos de caja</h1>
+  <p class="sub">Clasifica los movimientos del mes desde los libros bancos y arma el Excel por empresa.</p>
+  <div class="privado">🔒 Tus archivos no salen de esta computadora. Todo se procesa dentro del navegador;
+    internet solo se usa para descargar el motor la primera vez.</div>
+  <div class="motor"><span class="punto" id="punto"></span><span id="estadoMotor">Preparando el motor (Python en el navegador)… la primera vez tarda unos segundos.</span></div>
+
+  <section id="s1">
+    <div class="cab"><span class="num">1</span><h2>Modelo</h2></div>
+    <p class="ayuda">Carga <b>historico.csv</b> (entrena el modelo, unos minutos) o <b>modelo_web.pkl</b> si ya lo entrenaste antes (instantáneo).
+      Los dos están en el disco compartido.</p>
+    <div class="zona" data-input="f1"><input type="file" id="f1" accept=".csv,.pkl">Arrastra aquí el archivo o haz clic para elegirlo</div>
+    <div class="fila" id="cacheFila" hidden><button class="sec" id="usarCache">Usar el modelo guardado en este navegador</button><span class="ayuda" id="cacheInfo"></span></div>
+    <div class="info" id="i1"></div>
+    <div class="descargas" id="d1"></div>
+  </section>
+
+  <section id="s2" class="bloqueado">
+    <div class="cab"><span class="num">2</span><h2>Libros bancos del mes</h2></div>
+    <p class="ayuda">Un .xlsx por empresa (por ejemplo <i>ICP OCT 2026.xlsx</i>). El nombre del archivo debe incluir la empresa.</p>
+    <div class="zona" data-input="f2"><input type="file" id="f2" accept=".xlsx" multiple>Arrastra aquí los libros o haz clic para elegirlos</div>
+    <ul class="lista" id="l2"></ul>
+    <div class="fila">
+      <label>Mes a procesar<input type="month" id="mes"></label>
+      <label>Revisar si la confianza es menor a (%)<input type="number" id="umbral" min="50" max="100" step="1" value="90"></label>
+      <button id="b2" disabled>Clasificar</button>
+    </div>
+    <div class="info" id="i2"></div>
+    <div class="tabla" id="t2"></div>
+    <div class="descargas" id="d2"></div>
+  </section>
+
+  <section id="s3" class="bloqueado">
+    <div class="cab"><span class="num">3</span><h2>Enseñarle al modelo (opcional, una vez al mes)</h2></div>
+    <p class="ayuda">¿Corregiste categorías en la hoja MOVIMIENTOS de algún Excel? Súbelo aquí. Las hojas por cuenta se rehacen
+      con tus cambios y el modelo aprende para no repetir el error el próximo mes.
+      Si en el paso 1 cargaste <b>modelo_web.pkl</b>, sube también <b>historico.csv</b>.</p>
+    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel corregidos</div>
+    <ul class="lista" id="l3"></ul>
+    <div class="fila"><button id="b3" disabled>Aprender de mis correcciones</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
+    <div class="info" id="i3"></div>
+    <div class="descargas" id="d3"></div>
+  </section>
+
+  <details><summary>Detalle del proceso</summary><pre id="log"></pre></details>
+</main>
+
+<script id="codigoWorker" type="text/plain">/*__WORKER__*/</script>
+
+<script>/*__APP__*/</script>
+</body>
+</html>
