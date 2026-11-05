@@ -111,7 +111,8 @@ def _categoria_fm(r: dict[str, Any], e: Estructura) -> str:
 
 
 def repartir(mov: pd.DataFrame, e: Estructura, vinculadas: set[int], overs: list[Overnight],
-             hojas_libro: list[str], ws: Any = None) -> tuple[list[list[Fila]], pd.DataFrame, list[str]]:
+             hojas_libro: list[str], ws: Any = None,
+             periodo: tuple[int, int] | None = None) -> tuple[list[list[Fila]], pd.DataFrame, list[str]]:
     """Reparte los movimientos en los bloques de la hoja. Devuelve (contenido, los que no tienen sección, avisos)."""
     por_operacion = secciones_por_operacion()
     avisos = []
@@ -145,7 +146,10 @@ def repartir(mov: pd.DataFrame, e: Estructura, vinculadas: set[int], overs: list
             abonos[(r['hoja'], r['fecha'], round(r['monto'], 2))] = (fila, i)
     # interés = abono - cargo, en su propia sección
     intereses = _bloque_intereses(e.bloques, vinculadas)
-    meses = {f for f in mov.fecha}
+    def del_mes(f: Any) -> bool:
+        # las filas mal fechadas conservan su fecha original: el mes se compara con el periodo, no con esas fechas
+        return f is not None and (periodo is None or (f.year, f.month) == periodo)
+
     con_cargo = {(o.hoja, o.fecha_abono, round(o.abono, 2)) for o in overs if o.abono is not None}
     for clave in abonos:
         fila = abonos[clave][0]
@@ -153,7 +157,7 @@ def repartir(mov: pd.DataFrame, e: Estructura, vinculadas: set[int], overs: list
             avisos.append(f'{e.hoja}: el abono "{fila.concepto}" del {clave[1]} no tiene su cargo en el libro: '
                           f'sin interés calculado. Revisar.')
     for o in overs:
-        if o.hoja in hojas_libro and o.fecha_abono in meses and o.interes:
+        if o.hoja in hojas_libro and del_mes(o.fecha_abono) and o.interes:
             if intereses is None:
                 avisos.append(f'{e.hoja}: no hay sección de intereses overnight para {o.concepto}.')
                 continue

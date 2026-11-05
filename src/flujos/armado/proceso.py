@@ -120,7 +120,7 @@ def armar_flujo(clasificado: str, plantilla: str, empresa: str, anio: int, mes: 
         if not libros:
             return [[] for _ in e.bloques]
         contenido, resto, av = repartir(c.movimientos[c.movimientos.hoja.isin(libros)], e, vinculadas, overs, libros,
-                                        plantilla_ws(hoja))
+                                        plantilla_ws(hoja), (anio, mes))
         avisos.extend(av)
         if not resto.empty:
             sin_seccion.append(resto)
