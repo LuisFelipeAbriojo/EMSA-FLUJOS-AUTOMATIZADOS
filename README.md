@@ -1,37 +1,59 @@
-# Clasificador de flujos de caja
+# Flujos de caja
 
-Clasifica automáticamente los movimientos bancarios del mes (DEPOSITOS, ITF, PAGO PROVEEDORES, TRANSF. ENTRE CIAS, etc.)
-a partir de los **libros bancos** de cada empresa y arma un Excel por empresa con el formato del RESUMEN FLUJO.
+Del libro bancos al **RESUMEN FLUJO** de cada empresa: clasifica los movimientos del mes, arma el flujo con su formato de siempre
+y aprende de los flujos ya corregidos.
 
 **👉 App: https://luisfelipeabriojo.github.io/EMSA-FLUJOS-AUTOMATIZADOS/**
 
-## Cómo se usa (sin instalar nada)
-1. Abre la app en Chrome o Edge. La primera carga tarda ~15 s (descarga el motor).
-2. **Modelo:** carga `historico.csv` (entrena en ~1 min) o `modelo_web.pkl` si ya lo tienes (instantáneo). Ambos están en el disco compartido.
-3. **Libros bancos:** arrastra los `.xlsx` del mes (uno por empresa, con la empresa en el nombre: `ICP OCT 2026.xlsx`),
-   elige el mes y pulsa *Clasificar*. Descarga un Excel por empresa o un .zip con todos.
-4. **Revisa** en cada Excel la hoja MOVIMIENTOS: las filas amarillas tienen confianza baja. La columna CATEGORIA tiene lista desplegable.
-5. **(Opcional) Aprende de las correcciones:** sube los Excel revisados en el paso 3 de la app; descarga el `historico.csv`
-   actualizado y reemplaza el del disco compartido.
+No hay que instalar nada. También funciona abriendo el `index.html` con doble clic desde el disco compartido.
+
+## Uso mensual
+Ejemplo: en noviembre se cierra octubre. Usa Chrome o Edge. La primera carga tarda unos segundos porque descarga el motor.
+
+### 1. Modelo
+Carga `modelo_web.pkl` (instantáneo) o el `historico.csv` vigente (entrena en unos minutos). Los dos están en el disco compartido.
+
+### 2. Clasificar
+1. Arrastra los libros bancos del mes, un `.xlsx` por empresa con la empresa en el nombre: `ICP OCT 2026.xlsx`.
+2. Elige el mes y pulsa **Clasificar**. Sale un Excel clasificado por empresa.
+3. **Revisa la hoja MOVIMIENTOS** de cada uno. Las filas amarillas tienen confianza baja. La columna CATEGORIA tiene lista desplegable.
+
+### 3. Armar flujo
+1. Arrastra, por empresa, el Excel clasificado ya revisado y el RESUMEN FLUJO del mes anterior.
+2. Elige el mes, escribe el **TC de fin de mes** y pulsa **Armar flujo**.
+3. Descarga el RESUMEN FLUJO del mes y sus **notas para la Jefa de Finanzas**: controles, alertas, variaciones y supuestos.
+4. Revisa cada flujo en Excel y **guárdalo**. Un flujo que nadie volvió a guardar no puede entrar al histórico.
+
+### 4. Actualizar histórico
+Cuando los flujos del mes estén corregidos y entregados:
+1. Arrastra un `.zip` con esos flujos y el `historico.csv` vigente.
+2. Pulsa **Actualizar histórico**. Si una empresa y mes ya estaban, se reemplazan.
+3. Descarga el histórico nuevo (`historico_AAAA-MM-DD.csv`), el reporte de lo que entró y el modelo reentrenado.
+4. Guárdalos en el disco compartido, **sin borrar las versiones anteriores**.
 
 ## Privacidad
-Todo se procesa **dentro del navegador** (Python vía [Pyodide](https://pyodide.org)). Los libros, el histórico y los resultados
-**no se envían a ningún servidor**. Internet solo se usa para descargar el motor (cdn.jsdelivr.net y pypi.org).
-Este repositorio contiene solo código: ningún dato de las empresas (ver `.gitignore`).
+Todo se procesa **dentro del navegador** con [Pyodide](https://pyodide.org). Los libros, los flujos y el histórico **no se envían a ningún servidor**.
+Internet solo se usa para descargar el motor desde `cdn.jsdelivr.net`.
 
-## Resultados
-Validado con agosto 2026 contra la clasificación del equipo: **99,1 %** de acierto en 12.623 movimientos.
-Con el umbral de 90 % se revisa ~2,5 % de las filas, y el resto acierta 99,6 %.
+Este repositorio es público y contiene solo código. Ningún dato de las empresas puede subirse: lo impiden `.gitignore`,
+un hook de pre-commit y una revisión en cada integración continua.
 
-## Cómo funciona
-- **Memoria:** si un concepto (misma empresa y tipo) siempre tuvo la misma categoría, se repite.
-- **Modelo:** regresión logística sobre el texto del concepto, códigos, empresa, banco, moneda y rango de monto.
-  Solo propone categorías que esa empresa ya usó.
-- El ITF que viene en la misma fila (BBVA y otros) se separa y va siempre a la categoría ITF.
-- En ABONO / CARGO TRANSF. CTAS ordena por tipo de operación (overnight → BCR → cambio de moneda → fondos mutuos → otros)
-  y luego por fecha. El orden se cambia en `TIPOS_OPERACION` de `comun.py`.
-- Verifica que los saldos cuadren por cuenta. Si una fila o un bloque tiene un mes distinto al de las filas de arriba y abajo
-  (fecha mal digitada), se cuenta según su ubicación en el libro, se marca en amarillo y se lista en RESUMEN → FECHAS SOSPECHOSAS.
+## Resultados del clasificador
+Validado con agosto de 2026 contra la clasificación del equipo: **99,1 %** de acierto en 12.623 movimientos.
+Con el umbral de 90 % se revisa cerca del 2,5 % de las filas, y lo que pasa sin revisar acierta 99,6 %.
+
+## Limitaciones conocidas
+- **Revisión obligatoria:** el armado es un borrador con controles, no reemplaza la revisión del flujo.
+- **Hojas Over:** las filas disponibles son fijas. Si hay más overnights que filas, el que no entra se avisa en las notas y hay que agregarlo a mano.
+- **Ajuste de diferencia de cambio:** no se aplica solo. Se sugiere en las notas.
+- **Secciones nuevas:** no se crean solas. Sus movimientos se listan en las notas y hay que agregar la sección a mano.
+- **"Sin revisar":** el histórico detecta que nadie guardó el flujo, no qué tan a fondo se revisó.
+- **Impresión:** el flujo armado no conserva la configuración de impresión.
+
+## Documentación
+- [Arquitectura](docs/arquitectura.md)
+- [Inventario de ajustes mensuales](docs/ajustes-mensuales.md)
+- [Cambios por versión](CHANGELOG.md)
 
 ## Para desarrollo
 Requiere Python 3.11 o superior. Los datos reales viven fuera de este repositorio.
@@ -45,7 +67,6 @@ git config core.hooksPath .githooks
 .venv/Scripts/python scripts/construir_web.py
 ```
 
-- `src/flujos/`: `lectura/` (libros y flujos), `clasificacion/` (modelo y reglas), `reportes/` (Excel), `historico/`, `app/` (puente con la web), `cli.py`.
-- `web/`: la interfaz (HTML, CSS y JS). `scripts/construir_web.py` genera `dist/index.html` con el paquete incrustado.
-- Línea de comandos: `python -m flujos --help`.
-- Pruebas con datos reales: define `FLUJOS_DATOS` con la carpeta privada; si no existe, se saltan.
+- La línea de comandos es para desarrollo: `python -m flujos --help`.
+- Las pruebas con datos reales corren si `FLUJOS_DATOS` apunta a la carpeta privada; si no, se saltan.
+- Cada push a `main` que pasa las pruebas publica la app en GitHub Pages.
