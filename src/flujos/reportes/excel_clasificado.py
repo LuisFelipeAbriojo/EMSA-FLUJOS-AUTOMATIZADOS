@@ -1,11 +1,16 @@
 """Escribe el Excel clasificado de una empresa para un mes."""
+from __future__ import annotations
+
 import datetime as dt
+from typing import Any
+
 import pandas as pd
-from comun import SECCIONES_POR_OPERACION, tipo_operacion
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+
+from flujos.clasificacion.reglas import secciones_por_operacion, tipo_operacion
 
 AMARILLO = PatternFill('solid', fgColor='FFF2CC')
 GRIS = PatternFill('solid', fgColor='EDEDED')
@@ -18,17 +23,19 @@ MESES = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AG
          'NOVIEMBRE', 'DICIEMBRE']
 
 
-def secciones(mov, modelo, empresa):
+def secciones(mov: pd.DataFrame, modelo: Any, empresa: str) -> list[tuple[str, str]]:
     """Lista ordenada de (tipo, categoria): las que la empresa suele usar + las que aparecen este mes."""
     usadas = set()
     for tipo in ('INGRESO', 'EGRESO'):
         for c in modelo.permitidas.get((empresa, tipo), set()):
             usadas.add((tipo, c))
-    usadas |= set(zip(mov.tipo_seccion, mov.categoria))
+    usadas |= set(zip(mov.tipo_seccion, mov.categoria, strict=True))
     return sorted(usadas, key=lambda tc: (tc[0] != 'INGRESO', modelo.orden_de(empresa, tc[0], tc[1]), tc[1]))
 
 
-def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
+def escribir(ruta: str, empresa: str, anio: int, mes: int, mov: pd.DataFrame, cuentas: pd.DataFrame, modelo: Any,
+             umbral: float) -> pd.DataFrame:
+    """Escribe el Excel de la empresa y devuelve los movimientos con revisar y tipo_seccion."""
     mov = mov.copy()
     # el ITF que la empresa deja dentro del movimiento va en la misma sección que la otra parte de la fila
     mov['tipo_seccion'] = mov.tipo
@@ -73,7 +80,8 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
         Font(italic=True, color='C00000')
     sin = cuentas[cuentas.movimientos == 0].hoja.tolist()
     if sin:
-        ws.cell(fin + 1, 1, 'Cuentas sin movimientos en el mes: ' + ', '.join(sin)).font = Font(italic=True, color='666666')
+        ws.cell(fin + 1, 1, 'Cuentas sin movimientos en el mes: ' + ', '.join(sin)).font = \
+            Font(italic=True, color='666666')
     alertas = [x for a in cuentas.get('alertas', pd.Series(dtype=str)).fillna('') for x in a.split(' | ') if x]
     if alertas:
         ws.cell(fin + 2, 1, 'FECHAS SOSPECHOSAS EN EL LIBRO (conviene corregirlas en el libro bancos):').font = \
@@ -131,7 +139,7 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
         row[0].number_format = NUM
     for row in wm.iter_rows(min_row=2, min_col=8, max_col=8):
         row[0].number_format = '0%'
-    for col, w in zip('ABCDEFGHIJKLMNO', [16, 7, 11, 42, 9, 14, 30, 10, 28, 8, 10, 40, 14, 8, 8]):
+    for col, w in zip('ABCDEFGHIJKLMNO', [16, 7, 11, 42, 9, 14, 30, 10, 28, 8, 10, 40, 14, 8, 8], strict=True):
         wm.column_dimensions[col].width = w
     wm.freeze_panes = 'A2'
     wm.auto_filter.ref = f'A1:O{wm.max_row}'
@@ -147,6 +155,7 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
     dv.add(f'G2:G{max(wm.max_row, 2)}')
 
     # ---------- una hoja por cuenta, agrupada como sus RESUMEN FLUJO ----------
+    por_operacion = secciones_por_operacion()
     for _, cta in cuentas.iterrows():
         m = mov[mov.hoja == cta.hoja]
         if m.empty:
@@ -167,7 +176,7 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
         filas_debe, filas_haber = [], []
         for tipo_sec, cat in secs:
             s = m[(m.categoria == cat) & (m.tipo_seccion == tipo_sec)]
-            if cat in SECCIONES_POR_OPERACION:  # overnight, BCR, cambio de moneda...: por tipo y luego por fecha
+            if cat in por_operacion:  # overnight, BCR, cambio de moneda...: por tipo y luego por fecha
                 s = s.assign(_op=s.concepto.map(tipo_operacion)).sort_values(['_op', 'fecha', 'fila_origen'])
             else:
                 s = s.sort_values(['fecha', 'fila_origen'])
@@ -186,7 +195,6 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
                     for col in range(1, 8):
                         wc.cell(f, col).fill = AMARILLO
                 f += 1
-            colsub = 'C' if tipo_sec == 'INGRESO' else 'D'
             c = wc.cell(f, 5, f'=SUM(C{ini}:D{f - 1})' if f > ini else 0)
             c.number_format, c.font, c.border = NUM, B, LINEA
             if f > ini:

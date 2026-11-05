@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flujos"
+version = "0.2.0"
+description = "Clasificador de movimientos bancarios y armado del flujo de caja; corre en el navegador con Pyodide"
+readme = "README.md"
+requires-python = ">=3.11"
+# Las mismas versiones que trae Pyodide 0.27.7, para que el modelo sea intercambiable.
+dependencies = [
+    "numpy==2.0.2",
+    "openpyxl==3.1.5",
+    "pandas==2.2.3",
+    "scikit-learn==1.6.1",
+    "scipy==1.14.1",
+]
+
+[project.optional-dependencies]
+dev = ["build", "pytest", "ruff"]
+
+[project.scripts]
+flujos = "flujos.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flujos = ["recursos/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::UserWarning:openpyxl"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.format]
+quote-style = "preserve"

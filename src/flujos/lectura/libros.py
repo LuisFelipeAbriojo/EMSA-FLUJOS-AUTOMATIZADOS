@@ -1,12 +1,20 @@
 """Lee el libro bancos de una empresa (una hoja por cuenta) y devuelve solo los movimientos del mes pedido."""
-import datetime as dt, re
-import openpyxl, pandas as pd
-from comun import norm, banco, moneda, empresa_de
+from __future__ import annotations
+
+import datetime as dt
+import re
+from pathlib import PurePath
+from typing import Any
+
+import openpyxl
+import pandas as pd
+
+from flujos.lectura.normalizar import banco, empresa_de, moneda, norm
 
 COLS = ['FECHA', 'CONCEPTO', 'DEBE', 'HABER', 'SALDO']
 
 
-def _fecha(v):
+def _fecha(v: Any) -> dt.date | None:
     if isinstance(v, dt.datetime):
         return v.date()
     if isinstance(v, dt.date):
@@ -33,7 +41,7 @@ _MESES = {'ENE': 1, 'JAN': 1, 'FEB': 2, 'MAR': 3, 'ABR': 4, 'APR': 4, 'MAY': 5, 
           'AGO': 8, 'AUG': 8, 'SET': 9, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DIC': 12, 'DEC': 12}
 
 
-def _num(v):
+def _num(v: Any) -> float | None:
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return float(v)
     if isinstance(v, str):
@@ -44,9 +52,9 @@ def _num(v):
     return None
 
 
-def leer_empresa(ruta, anio, mes, empresa=None):
+def leer_empresa(ruta: str, anio: int, mes: int, empresa: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Devuelve (movimientos DataFrame, cuentas DataFrame con saldos)."""
-    empresa = empresa or empresa_de(ruta.split('/')[-1])
+    empresa = empresa or empresa_de(PurePath(ruta).name)
     wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
     ini_mes = dt.date(anio, mes, 1)
     fin_mes = (dt.date(anio + (mes == 12), mes % 12 + 1, 1))
@@ -86,7 +94,9 @@ def leer_empresa(ruta, anio, mes, empresa=None):
         # está mal fechada (ej. 08/09 en vez de 09/08). El saldo del libro la cuenta donde está ubicada,
         # así que se asigna al mes de sus vecinas y se avisa.
         # También bloques: varias filas seguidas con otro mes (ej. 17 filas "21/08" en medio del 21/09).
-        ym = lambda x: x.year * 12 + x.month
+        def ym(x: dt.date) -> int:
+            return x.year * 12 + x.month
+
         alertas = []
         tramos = []  # [inicio, fin) de filas consecutivas con el mismo mes
         for i, it in enumerate(fechadas):

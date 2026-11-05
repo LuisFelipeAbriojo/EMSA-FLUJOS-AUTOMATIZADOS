@@ -5,22 +5,29 @@ Dos capas:
   2. Modelo lineal (regresión logística) sobre el texto del concepto + empresa, banco, moneda, tipo y monto.
 Solo se proponen categorías que esa empresa ya usó para ese tipo (ingreso/egreso).
 """
-import re, unicodedata
+from __future__ import annotations
+
+import pickle
+import re
+import unicodedata
 from collections import Counter, defaultdict
-import numpy as np, pandas as pd
+from typing import Any
+
+import numpy as np
+import pandas as pd
 from scipy.sparse import hstack
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
 
 
-def limpiar(s):
+def limpiar(s: Any) -> str:
     s = unicodedata.normalize('NFKD', str(s)).encode('ascii', 'ignore').decode().upper()
     s = re.sub(r'\d+', '#', s)  # números de operación, facturas, fechas
     return re.sub(r'\s+', ' ', s).strip()
 
 
-def _prep(d):
+def _prep(d: pd.DataFrame) -> pd.DataFrame:
     d = d.copy()
     d['txt'] = d.concepto.map(limpiar)
     d['raw'] = d.concepto.map(lambda x: re.sub(r'\s+', ' ', str(x).upper()).strip())
@@ -33,9 +40,9 @@ def _prep(d):
 class Clasificador:
     CAT = ['empresa', 'tipo', 'banco', 'moneda', 'rango']
 
-    def fit(self, d):
+    def fit(self, d: pd.DataFrame) -> Clasificador:
         d = _prep(d)
-        # el ITF que viene en la misma fila siempre va a ITF (aunque algún flujo cerrado lo haya dejado en el movimiento)
+        # el ITF que viene en la misma fila siempre va a ITF (aunque algún flujo cerrado lo dejara en el movimiento)
         if 'itf_misma_fila' in d:
             d.loc[d.itf_misma_fila.fillna(0).astype(int) == 1, 'categoria'] = 'ITF'
         self.tf_c = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 5), min_df=2, sublinear_tf=True)
@@ -45,9 +52,11 @@ class Clasificador:
         X = hstack([self.tf_c.fit_transform(d.txt), self.tf_w.fit_transform(d.txt), self.tf_k.fit_transform(d.cod),
                     self.oh.fit_transform(d[self.CAT]) * 1.5]).tocsr()
         self.lr = LogisticRegression(C=10, max_iter=3000, class_weight='balanced').fit(X, d.categoria)
-        top = lambda v: (v.most_common(1)[0][0], v.most_common(1)[0][1] / sum(v.values()), sum(v.values()))
+        def top(v: Counter) -> tuple[str, float, int]:
+            return v.most_common(1)[0][0], v.most_common(1)[0][1] / sum(v.values()), sum(v.values())
+
         m1, m2 = defaultdict(Counter), defaultdict(Counter)
-        for r, t, e, ti, c in zip(d.raw, d.txt, d.empresa, d.tipo, d.categoria):
+        for r, t, e, ti, c in zip(d.raw, d.txt, d.empresa, d.tipo, d.categoria, strict=True):
             m1[(r, e, ti)][c] += 1
             m2[(t, e, ti)][c] += 1
         self.mem_exacta = {k: top(v) for k, v in m1.items()}
@@ -60,11 +69,11 @@ class Clasificador:
         self.n_entrenamiento = len(d)
         return self
 
-    def orden_de(self, empresa, tipo, cat):
+    def orden_de(self, empresa: str, tipo: str, cat: str) -> float:
         o = getattr(self, 'orden', {})
         return o.get((empresa, tipo, cat), 999)
 
-    def predict(self, d):
+    def predict(self, d: pd.DataFrame) -> pd.DataFrame:
         """Devuelve DataFrame con categoria, confianza, alternativa, origen."""
         d = _prep(d.reset_index(drop=True))
         X = hstack([self.tf_c.transform(d.txt), self.tf_w.transform(d.txt), self.tf_k.transform(d.cod),
@@ -72,7 +81,7 @@ class Clasificador:
         P = self.lr.predict_proba(X)
         clases = self.lr.classes_
         out = []
-        for i, (e, ti, r, t) in enumerate(zip(d.empresa, d.tipo, d.raw, d.txt)):
+        for i, (e, ti, r, t) in enumerate(zip(d.empresa, d.tipo, d.raw, d.txt, strict=True)):
             ok = self.permitidas.get((e, ti)) or self.permitidas_tipo.get(ti, set(clases))
             p = np.where(np.isin(clases, list(ok)), P[i], 0)
             p = p / p.sum() if p.sum() > 0 else P[i]
@@ -90,3 +99,24 @@ class Clasificador:
             i = np.where(d.itf_misma_fila.fillna(0).astype(int) == 1)[0]
             res.loc[i, ['categoria', 'confianza', 'origen']] = ['ITF', 0.99, 'regla ITF']
         return res
+
+
+class _CargadorCompatible(pickle.Unpickler):
+    """Permite abrir modelos guardados antes de la reestructura, cuando la clase vivía en el módulo `modelo`."""
+
+    def find_class(self, module: str, name: str) -> Any:
+        return super().find_class('flujos.clasificacion.modelo' if module == 'modelo' else module, name)
+
+
+def cargar_modelo(ruta: str) -> Clasificador:
+    """Abre un modelo guardado, también los generados con versiones anteriores de la herramienta."""
+    with open(ruta, 'rb') as f:
+        try:
+            return _CargadorCompatible(f).load()
+        except (pickle.UnpicklingError, EOFError, AttributeError, ModuleNotFoundError) as e:
+            raise ValueError(f'El archivo {ruta} no es un modelo válido. Vuelve a entrenarlo con historico.csv.') from e
+
+
+def guardar_modelo(modelo: Clasificador, ruta: str) -> None:
+    with open(ruta, 'wb') as f:
+        pickle.dump(modelo, f)

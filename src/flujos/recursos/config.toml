@@ -1,0 +1,93 @@
+# Configuración general. Sin datos privados: este archivo es público.
+
+[clasificacion]
+umbral_revision = 0.9
+
+[empresas]
+codigos = ["REVO", "ECSA", "ESSA", "SBSA", "ONE", "ICP", "ELSA", "ECNA", "T1"]
+
+# Se revisan en este orden; el primero que calce gana.
+[[bancos]]
+codigo = "BCP"
+claves = ["BCP"]
+[[bancos]]
+codigo = "BBVA"
+claves = ["BBVA"]
+[[bancos]]
+codigo = "SCOT"
+claves = ["SCOT", "SBK"]
+[[bancos]]
+codigo = "IBK"
+claves = ["IBK"]
+[[bancos]]
+codigo = "BIF"
+claves = ["BIF"]
+[[bancos]]
+codigo = "SANT"
+claves = ["SANT"]
+[[bancos]]
+codigo = "PICH"
+claves = ["PICH"]
+[[bancos]]
+codigo = "NACION"
+claves = ["NAC", "BN"]
+[[bancos]]
+codigo = "GNB"
+claves = ["GNB"]
+[[bancos]]
+codigo = "BCI"
+claves = ["BCI"]
+[[bancos]]
+codigo = "FM"
+claves = ["FM", "FONDO", "F.MUTUO"]
+
+[monedas]
+# Bancos cuyas cuentas son en dólares si ni la hoja ni la cabecera dicen la moneda.
+bancos_en_dolares_por_defecto = ["PICH", "SANT", "GNB", "BCI"]
+
+# Variantes de escritura de una misma sección -> un solo nombre.
+[categorias.variantes]
+"ABONO TRANSF CTAS" = "ABONO TRANSF. CTAS"
+"ABONO TRANSF." = "ABONO TRANSF. CTAS"
+"CARGO TRANSF CTAS" = "CARGO TRANSF. CTAS"
+"CARGO TRASNF CTAS" = "CARGO TRANSF. CTAS"
+"CARGO TRANS. CTAS" = "CARGO TRANSF. CTAS"
+"TRANSF CIAS" = "TRANSF. ENTRE CIAS"
+"TRANSF. CIAS" = "TRANSF. ENTRE CIAS"
+"TRANSF ENTRE CIAS" = "TRANSF. ENTRE CIAS"
+"TRANSF. ENTRE CIAS." = "TRANSF. ENTRE CIAS"
+"CARGO TRANSF. CIAS" = "TRANSF. ENTRE CIAS"
+"TRANSF CIAS TCP" = "TRANSF. ENTRE CIAS"
+"TRANSF EXTERIOR" = "TRANSF. EXTERIOR"
+"TRANSF. EXT." = "TRANSF. EXTERIOR"
+"TRANSF EXTERIOR (FLETES Y RPTOS)" = "TRANSF. EXTERIOR"
+"PAGO DE DETRACCIONES" = "PAGO DETRACCIONES"
+"INGESOS POR ALQUILER" = "INGRESOS POR ALQUILER"
+"DEVOLUCIONES - OTROS EGRESOS" = "DEVOLUCIONES / OTROS EGRESOS"
+"DEVOLUCIONES / OTROS EGRESO" = "DEVOLUCIONES / OTROS EGRESOS"
+"OTROS EGRESOS - DEVOLUCIONES" = "DEVOLUCIONES / OTROS EGRESOS"
+"PAGO GRATIFICACION" = "GRATIFICACIONES"
+"PAGO GRATIFICACIONES" = "GRATIFICACIONES"
+"PRESTAMO TERCEROS" = "PRESTAMOS DE TERCEROS"
+"FINANCIAMIENTOS" = "FINANCIAMIENTO"
+"OTROS INGRESOS" = "OTROS INGRESOS"
+"DUAS" = "PAGO DUAS"
+"AFP" = "PAGO AFP"
+
+# Dentro de estas secciones se ordena por tipo de operación y luego por fecha.
+[transferencias]
+secciones = ["ABONO TRANSF. CTAS", "CARGO TRANSF. CTAS"]
+
+# En este orden aparecen en la hoja; lo que no calce va al final.
+[[transferencias.tipos]]
+nombre = "OVERNIGHT"
+patron = '\bOV\w*N\w*G\w*T\b|\bOVERNIGHT|\bOVERN'
+[[transferencias.tipos]]
+nombre = "BCR"
+patron = '\bBCR\b'
+[[transferencias.tipos]]
+nombre = "CAMBIO DE MONEDA"
+patron = 'DOLARES|CAMBIO (DE )?MONEDA|\bCOMU\$|\bT\.?C\.? ?\d'
+[[transferencias.tipos]]
+nombre = "FONDOS MUTUOS"
+patron = 'FONDOS? MUTUOS?|RESCATE|\bF\.? ?MUTUO|CPDADM'
