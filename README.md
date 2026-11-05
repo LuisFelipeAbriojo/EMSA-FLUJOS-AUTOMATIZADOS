@@ -33,18 +33,19 @@ Con el umbral de 90 % se revisa ~2,5 % de las filas, y el resto acierta 99,6 %.
 - Verifica que los saldos cuadren por cuenta. Si una fila o un bloque tiene un mes distinto al de las filas de arriba y abajo
   (fecha mal digitada), se cuenta según su ubicación en el libro, se marca en amarillo y se lista en RESUMEN → FECHAS SOSPECHOSAS.
 
-| Archivo | Qué hace |
-|---|---|
-| `index.html` | La app web (generada; no editar a mano) |
-| `web/plantilla.html` | Interfaz de la app |
-| `app_web.py` | Puente entre la página y el clasificador |
-| `leer_libro.py` | Lee el libro bancos y extrae los movimientos y saldos del mes |
-| `modelo.py` | Clasificador (memoria + regresión logística) |
-| `salida.py` | Escribe el Excel por empresa |
-| `clasificar_mes.py`, `actualizar.py`, `entrenar.py` | Versión de línea de comandos |
-| `extraer_historico.py` | Arma `historico.csv` desde RESUMEN FLUJO cerrados |
-| `construir_web.py` | Regenera `index.html` |
-
 ## Para desarrollo
-- Si cambias algún `.py`, regenera la app: `python construir_web.py`, luego commit y push.
-- Versión de escritorio (requiere Python 3.10+): ver [LEEME.md](LEEME.md).
+Requiere Python 3.11 o superior. Los datos reales viven fuera de este repositorio.
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+git config core.hooksPath .githooks
+.venv/Scripts/python -m pytest
+.venv/Scripts/ruff check src tests scripts
+.venv/Scripts/python scripts/construir_web.py
+```
+
+- `src/flujos/`: `lectura/` (libros y flujos), `clasificacion/` (modelo y reglas), `reportes/` (Excel), `historico/`, `app/` (puente con la web), `cli.py`.
+- `web/`: la interfaz (HTML, CSS y JS). `scripts/construir_web.py` genera `dist/index.html` con el paquete incrustado.
+- Línea de comandos: `python -m flujos --help`.
+- Pruebas con datos reales: define `FLUJOS_DATOS` con la carpeta privada; si no existe, se saltan.

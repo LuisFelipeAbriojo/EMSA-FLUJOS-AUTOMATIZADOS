@@ -7,6 +7,7 @@ Solo se proponen categorías que esa empresa ya usó para ese tipo (ingreso/egre
 """
 from __future__ import annotations
 
+import os
 import pickle
 import re
 import unicodedata
@@ -114,7 +115,8 @@ def cargar_modelo(ruta: str) -> Clasificador:
         try:
             return _CargadorCompatible(f).load()
         except (pickle.UnpicklingError, EOFError, AttributeError, ModuleNotFoundError) as e:
-            raise ValueError(f'El archivo {ruta} no es un modelo válido. Vuelve a entrenarlo con historico.csv.') from e
+            nombre = os.path.basename(ruta)
+            raise ValueError(f'"{nombre}" no es un modelo válido. Vuelve a entrenarlo con historico.csv.') from e
 
 
 def guardar_modelo(modelo: Clasificador, ruta: str) -> None:

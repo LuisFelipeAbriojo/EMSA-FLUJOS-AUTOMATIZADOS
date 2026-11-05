@@ -33,6 +33,10 @@ onmessage = async (ev) => {
     const sal = salidas();
     postMessage({ id, ok: true, valor, salidas: sal }, sal.map(s => s.bytes));
   } catch (e) {
-    postMessage({ id, ok: false, error: String(e.message || e) });
+    // El detalle técnico queda en el registro; a la persona solo le llega el mensaje final en español.
+    const texto = String(e.message || e);
+    avisar(texto);
+    const ultima = texto.trim().split('\n').pop().replace(/^[\w.]*(Error|Exception): /, '');
+    postMessage({ id, ok: false, error: ultima });
   }
 };
