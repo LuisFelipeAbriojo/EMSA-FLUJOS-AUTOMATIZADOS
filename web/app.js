@@ -173,7 +173,7 @@ $('bA').onclick = () => trabajar('iA', 'Armando el flujo… puede tardar un par 
   const conErrores = buenos.filter(h => h.errores).length;
   info.className = buenos.length && !conErrores && buenos.length === filas.length ? 'info ok' : 'info err';
   info.textContent = !buenos.length ? 'No se armó ningún flujo: revisa los mensajes de la tabla.' :
-    `${buenos.length} flujos armados. ${conErrores ? conErrores + ' con controles sin pasar: mira sus notas antes de presentarlos.' : 'Todos pasaron los controles.'}`;
+    `Flujos armados: ${buenos.length}. ${conErrores ? `Con controles sin pasar: ${conErrores}. Mira sus notas antes de presentarlos.` : 'Todos pasaron los controles.'}`;
   $('tA').innerHTML = '<table><tr><th>Empresa</th><th class="n">Movimientos</th><th>Controles</th><th>Avisos</th><th>Flujo</th><th>Notas</th></tr>' +
     filas.map(h => h.error
       ? `<tr><td><b>${esc(h.empresa)}</b></td><td colspan="5"><span class="chip bad">${esc(h.error)}</span></td></tr>`
