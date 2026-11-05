@@ -140,6 +140,22 @@ def _correr_columna(formula: str) -> str:
     return tok.render()
 
 
+def _continuar_saldo(ws: Worksheet, col_x: int, r: Rodaje) -> None:
+    """El saldo inicial del mes nuevo es el final del mes que termina, aunque la columna ya trajera otra fórmula."""
+    previa, letra_x = get_column_letter(col_x - 1), get_column_letter(col_x)
+    for c in [x for x in ws._cells.values() if x.column == col_x and _es_formula(x.value)]:
+        m = re.fullmatch(rf'=\+?{previa}(\d+)', c.value)
+        if not m:
+            continue
+        destino = ws.cell(c.row, col_x + 1)
+        esperado = f'=+{letra_x}{m.group(1)}'
+        if destino.value == esperado or destino.value == f'={letra_x}{m.group(1)}':
+            continue
+        if destino.value is not None:
+            r.avisos.append(f'TOTAL!{destino.coordinate} traía {destino.value}: el saldo inicial ahora sigue al mes anterior.')
+        destino.value = esperado
+
+
 def rodar_total(ws: Worksheet, valores: Worksheet, anterior: str, anio: int, mes: int, r: Rodaje) -> None:
     """Congela la columna del mes anterior y crea los vínculos de la columna nueva."""
     columnas = _links_por_columna(ws, anterior)
@@ -158,6 +174,7 @@ def rodar_total(ws: Worksheet, valores: Worksheet, anterior: str, anio: int, mes
                 r.celdas_nuevas += 1
             c.value = valores[c.coordinate].value
             r.celdas_congeladas += 1
+    _continuar_saldo(ws, col_x, r)
     # variaciones del mes contra el anterior, rótulos, acumulado comparable y título
     for c in list(ws._cells.values()):
         v = c.value

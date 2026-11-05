@@ -48,7 +48,7 @@ Con el umbral de 90 % se revisa cerca del 2,5 % de las filas, y lo que pasa sin 
 - **Ajuste de diferencia de cambio:** no se aplica solo. Se sugiere en las notas.
 - **Secciones nuevas:** no se crean solas. Sus movimientos se listan en las notas y hay que agregar la sección a mano.
 - **"Sin revisar":** el histórico detecta que nadie guardó el flujo, no qué tan a fondo se revisó.
-- **Impresión:** el flujo armado no conserva la configuración de impresión.
+- **Impresora:** se conservan orientación, márgenes, escala y áreas de impresión. No se conservan los ajustes propios del controlador de la impresora.
 
 ## Documentación
 - [Arquitectura](docs/arquitectura.md)

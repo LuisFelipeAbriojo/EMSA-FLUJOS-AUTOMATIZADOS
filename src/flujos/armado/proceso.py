@@ -27,6 +27,7 @@ from flujos.validacion.revision import (
     saldos_contra_libro,
     secciones_contra_movimientos,
     subtotales_completos,
+    total_contra_mensual,
 )
 
 log = logging.getLogger(__name__)
@@ -162,6 +163,7 @@ def armar_flujo(clasificado: str, plantilla: str, empresa: str, anio: int, mes: 
     controles += subtotales_completos(wb, res.estructuras)
     controles += errores_de_formula(wb, ev, {(r.hoja_mensual_nueva if h == r.hoja_mensual_anterior else h, x) for h, x in previos})
     controles += resumen_cuadra(wb, ev, r.hoja_mensual_nueva)
+    controles += total_contra_mensual(wb, ev, r.hoja_mensual_nueva, r.columna_nueva)
     if not faltantes.empty:
         controles.append(Control('Todos los movimientos tienen sección', False,
                                  f'{len(faltantes)} movimientos sin sección: no están en el flujo. Ver Alertas.'))

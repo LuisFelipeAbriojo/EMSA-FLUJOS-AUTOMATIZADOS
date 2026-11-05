@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import openpyxl
+from openpyxl import Workbook
 from openpyxl.formula import Tokenizer
 from openpyxl.formula.tokenizer import Token
 from openpyxl.utils import get_column_letter
@@ -185,6 +186,22 @@ def _vinculos_a_movimientos(wb: Any, mensual: str, estructuras: dict[str, Estruc
     return avisos
 
 
+def _congelar_vinculos_externos(wb: Workbook, valores: Workbook) -> list[str]:
+    """Una fórmula que apunta a otro libro no se puede recalcular aquí: queda con el valor que tenía guardado."""
+    avisos = []
+    for ws in wb.worksheets:
+        celdas = [c for c in ws._cells.values()
+                  if isinstance(c.value, str) and c.value.startswith('=') and re.search(r'\[\d+\]', c.value)]
+        for c in celdas:
+            c.value = valores[ws.title][c.coordinate].value
+        if celdas:
+            avisos.append(f'{ws.title}: {len(celdas)} fórmulas apuntaban a otro libro; quedaron con su valor guardado '
+                          f'({", ".join(c.coordinate for c in celdas[:5])}).')
+    if avisos and not any('[' in str(d.attr_text) for d in wb.defined_names.values()):
+        wb._external_links = []
+    return avisos
+
+
 def armar(plantilla: str, empresa: str, anio: int, mes: int, tc: float, fuente: Fuente,
           overs: tuple[list[Overnight], list[Overnight]] | None = None,
           saldo_libro: dict[str, float] | None = None) -> Resultado:
@@ -199,6 +216,7 @@ def armar(plantilla: str, empresa: str, anio: int, mes: int, tc: float, fuente: 
     r = Rodaje(anterior, nuevo)
     res = Resultado(wb, r)
 
+    res.avisos += _congelar_vinculos_externos(wb, valores)
     mapas: dict[str, MapaFilas] = {}
     over = hoja_over(wb.sheetnames)
     res.vinculadas = filas_vinculadas(wb, anterior)

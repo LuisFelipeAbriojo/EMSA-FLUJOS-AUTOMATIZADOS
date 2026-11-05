@@ -52,8 +52,10 @@ Medido con un guardado sin cambios en las 9 empresas. Los archivos no tienen gr�
 |---|---|
 | Estilos, anchos visibles, combinadas, paneles y hojas ocultas | Se conservan. |
 | Valores calculados | openpyxl los pierde, pero `guardar.py` los vuelve a escribir. |
-| Configuración de impresión | Se pierde. |
-| Cuadros de texto vacíos de ELSA | Se pierden. |
+| Orientación, márgenes, escala, DPI y áreas de impresión | Se conservan. Medido en 124 hojas. |
+| Ajustes del controlador de la impresora | Se pierden. Son binarios propios de cada impresora, y no se reinyectan. |
+| Nombres ocultos de filtros antiguos | Se pierden, sin efecto visible. |
+| Cuadros de texto vacíos de ELSA | Se pierden, sin efecto visible. |
 | Comentarios | Se reescriben, y su tamaño puede cambiar. |
 
 ## Pendiente de confirmar con Finanzas

@@ -59,6 +59,8 @@ Una configuración local no versionada puede agregarse con la variable `FLUJOS_C
 - Subtotales que cubren todas sus filas.
 - Sin errores de fórmula nuevos.
 - Hoja mensual cuadrada.
+- Todas las líneas de la hoja mensual llegan a TOTAL.
+- Saldo final de TOTAL contra la hoja mensual, como aviso porque los flujos cerrados también suelen traer esa diferencia.
 - Movimientos sin sección y filas que siguieron por revisar.
 
 ## Histórico

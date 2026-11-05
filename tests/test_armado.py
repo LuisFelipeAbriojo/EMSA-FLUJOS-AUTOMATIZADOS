@@ -6,16 +6,17 @@ import pandas as pd
 import pytest
 from openpyxl.styles import Font
 
-from flujos.armado.armar import armar
+from flujos.armado.armar import _congelar_vinculos_externos, armar
 from flujos.armado.estructura import Fila, analizar, filas_de_bloque
 from flujos.armado.formulas import traducir
 from flujos.armado.fuentes import asignar_hojas, nombre_salida
 from flujos.armado.overnight import cruzan, emparejar
 from flujos.armado.proceso import armar_flujo
-from flujos.armado.rodar import nombre_hoja_mensual, rotular_mes, ubicar_tc
+from flujos.armado.rodar import Rodaje, nombre_hoja_mensual, rodar_total, rotular_mes, ubicar_tc
 from flujos.clasificacion.clasificar import clasificar
 from flujos.lectura.flujos import leer_flujo
 from flujos.validacion.evaluador import ErrorExcel, Evaluador
+from flujos.validacion.revision import total_contra_mensual
 from sinteticos import D, historico, libro_basico
 
 TC_AGO, TC_SET = 3.30, 3.40
@@ -369,3 +370,62 @@ def test_no_modifica_la_plantilla(tmp_path):
     armar(ruta, 'ICP', 2026, 9, TC_SET, _fuente({}))
     assert open(ruta, 'rb').read() == antes
     assert not historico().empty
+
+
+def test_saldo_inicial_sigue_al_mes_anterior_aunque_la_columna_traiga_otra_formula():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws['C5'] = "=+AGOSTO!C1"
+    ws['B9'], ws['C9'], ws['D9'] = '=+A10', '=+B10', '=+A10'
+    v = openpyxl.Workbook().active
+    r = Rodaje('AGOSTO', 'SETIEMBRE')
+    rodar_total(ws, v, 'AGOSTO', 2026, 9, r)
+    assert ws['D9'].value == '=+C10'
+    assert any('D9' in a for a in r.avisos)
+
+
+def test_vinculos_a_otro_libro_quedan_con_su_valor_guardado():
+    wb, valores = openpyxl.Workbook(), openpyxl.Workbook()
+    wb.active['A1'] = "=+'[1]JUL-26'!Q42"
+    wb.active['A2'] = '=SUM(A1:A1)'
+    valores.active['A1'] = 123.45
+    avisos = _congelar_vinculos_externos(wb, valores)
+    assert wb.active['A1'].value == 123.45 and wb.active['A2'].value == '=SUM(A1:A1)'
+    assert 'otro libro' in avisos[0]
+
+
+def _mensual_y_total(vinculos):
+    wb = openpyxl.Workbook()
+    t = wb.active
+    t.title = 'TOTAL'
+    m = wb.create_sheet('SETIEMBRE')
+    m['C5'] = 'TOTALES'
+    m['A8'], m['C8'] = 'DEPOSITOS', 100.0
+    m['A9'], m['C9'] = 'TRANSF. AL EXTERIOR', 30.0
+    m['A10'], m['C10'] = 'TOTAL INGRESOS', '=SUM(C8:C9)'
+    m['A12'], m['C12'] = 'Saldo final', '=C10'
+    t['A8'], t['B8'] = 'DEPOSITOS', '=+SETIEMBRE!$C$8'
+    t['A9'] = 'TRANSFERENCIA EXT.'
+    if vinculos:
+        t['B9'] = '=+SETIEMBRE!C9'
+    t['A12'], t['B12'] = 'SALDO FINAL DE CAJA', '=SUM(B8:B9)'
+    return wb
+
+
+def test_control_detecta_linea_que_no_llega_a_total():
+    wb = _mensual_y_total(False)
+    lineas, saldo = total_contra_mensual(wb, Evaluador(wb), 'SETIEMBRE', 'B')
+    assert not lineas.aprobado and 'TRANSF. AL EXTERIOR' in lineas.detalle
+    assert not saldo.aprobado
+
+
+def test_control_de_total_sin_saldo_no_rompe_el_armado():
+    wb = _mensual_y_total(True)
+    wb['TOTAL']['B12'] = None
+    _, saldo = total_contra_mensual(wb, Evaluador(wb), 'SETIEMBRE', 'B')
+    assert not saldo.aprobado and 'sin valor' in saldo.detalle and saldo.nivel == 'AVISO'
+
+
+def test_control_pasa_si_todas_las_lineas_llegan_a_total():
+    wb = _mensual_y_total(True)
+    assert all(c.aprobado for c in total_contra_mensual(wb, Evaluador(wb), 'SETIEMBRE', 'B'))

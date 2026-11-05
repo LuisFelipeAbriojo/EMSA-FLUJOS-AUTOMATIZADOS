@@ -1,6 +1,15 @@
 # Cambios
 
-## 0.3.0 (sin publicar)
+## 0.3.1 (sin publicar)
+### Corregido
+- El saldo inicial del mes nuevo en TOTAL siempre sigue al saldo final del mes anterior, aunque la columna ya trajera otra fórmula.
+- Las fórmulas que apuntan a otro libro quedan con su valor guardado, en vez de salir como `#REF!`.
+
+### Agregado
+- Control de líneas de la hoja mensual que no llegan a TOTAL.
+- Aviso de diferencia entre el saldo final de TOTAL y el de la hoja mensual.
+
+## 0.3.0
 ### Agregado
 - Paso **Actualizar histórico**: recibe un `.zip` con flujos corregidos y el `historico.csv` vigente, y entrega el histórico con fecha, un reporte y el modelo reentrenado.
 - Reemplazo por empresa y periodo, sin tocar lo demás.

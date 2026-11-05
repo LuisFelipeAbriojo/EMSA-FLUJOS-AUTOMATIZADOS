@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.utils import column_index_from_string, get_column_letter
 
 from flujos.armado.estructura import Estructura, analizar
 from flujos.validacion.evaluador import ErrorExcel, Evaluador
@@ -141,6 +142,57 @@ def errores_existentes(wb: Workbook) -> set[tuple[str, str]]:
                 if '#REF!' in celda.value or isinstance(ev._valor_en(ws.title, f, c), ErrorExcel):
                     salida.add((ws.title, celda.coordinate))
     return salida
+
+
+def _columna_totales(ws: Any) -> int | None:
+    for f in range(1, 12):
+        for c in ws[f]:
+            if isinstance(c.value, str) and c.value.strip().upper() in ('TOTALES', 'TOTAL'):
+                return c.column
+    return None
+
+
+def _fila_de(ws: Any, patron: str, columnas: int = 3) -> int | None:
+    for fila in ws.iter_rows(min_col=1, max_col=columnas):
+        for c in fila:
+            if isinstance(c.value, str) and re.match(patron, c.value, re.I):
+                return c.row
+    return None
+
+
+def _texto(v: Any) -> str:
+    return f'{v:,.2f}' if isinstance(v, (int, float)) else 'sin valor'
+
+
+def total_contra_mensual(wb: Workbook, ev: Evaluador, mensual: str, columna: str | None) -> list[Control]:
+    """La columna del mes en TOTAL debe recibir todas las líneas de la hoja mensual y llegar al mismo saldo."""
+    if columna is None:
+        return []
+    ws, total = wb[mensual], wb['TOTAL']
+    col_mes, col_total = _columna_totales(ws), column_index_from_string(columna)
+    fin_mes, fin_total = _fila_de(ws, r'\s*saldo\s+final'), _fila_de(total, r'\s*saldo\s+final')
+    if col_mes is None or fin_mes is None or fin_total is None:
+        return [Control('TOTAL recibe la hoja mensual', False, 'No encontré las filas de saldo final para comparar.', 'AVISO')]
+    letra = get_column_letter(col_mes)
+    usadas = set()
+    for c in total._cells.values():
+        if c.column == col_total and isinstance(c.value, str) and c.value.startswith('='):
+            usadas |= {int(x) for x in re.findall(rf"{re.escape(mensual)}'?!\$?{letra}\$?(\d+)", c.value)}
+    faltan = []
+    for f in range(7, _fila_de(ws, r'\s*saldo\s+inicial') or fin_mes):
+        v = ev._valor_en(mensual, f, col_mes)
+        rotulo = next((ws.cell(f, c).value for c in (1, 2) if isinstance(ws.cell(f, c).value, str)), '')
+        if isinstance(v, (int, float)) and abs(v) > TOLERANCIA and f not in usadas and rotulo.strip() \
+                and not re.match(r'\s*(total|saldo|ingresos|egresos)', rotulo, re.I):
+            faltan.append(f'{rotulo.strip()} ({v:,.2f})')
+    controles = [Control('Todas las líneas de la hoja mensual llegan a TOTAL', not faltan,
+                         f'Sin vínculo en TOTAL: {", ".join(faltan)}.' if faltan else '')]
+    a, b = ev._valor_en(mensual, fin_mes, col_mes), ev._valor_en('TOTAL', fin_total, col_total)
+    ok = isinstance(a, (int, float)) and isinstance(b, (int, float)) and abs(a - b) <= 1
+    # los flujos cerrados suelen traer esta diferencia entre un mes y otro: conviene mirarla, no impide presentar
+    detalle = '' if ok else f'Hoja mensual {_texto(a)}, TOTAL {_texto(b)}. Compárala con la diferencia del mes anterior.'
+    controles.append(Control('TOTAL llega al saldo final de la hoja mensual', ok, detalle, 'AVISO'))
+    return controles
 
 
 def resumen_cuadra(wb: Workbook, ev: Evaluador, mensual: str) -> list[Control]:
