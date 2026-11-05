@@ -14,6 +14,7 @@ from flujos.armado.overnight import cruzan, emparejar
 from flujos.armado.proceso import armar_flujo
 from flujos.armado.rodar import nombre_hoja_mensual, rotular_mes, ubicar_tc
 from flujos.clasificacion.clasificar import clasificar
+from flujos.lectura.flujos import leer_flujo
 from flujos.validacion.evaluador import ErrorExcel, Evaluador
 from sinteticos import D, historico, libro_basico
 
@@ -353,6 +354,8 @@ def test_proceso_completo_con_validaciones_y_notas(tmp_path, modelo):
     notas = openpyxl.load_workbook(a.notas)
     assert notas.sheetnames == ['Resumen', 'Validaciones', 'Alertas', 'Variaciones', 'Supuestos']
     assert notas['Resumen']['B4'].value == TC_SET
+    # queda marcado hasta que una persona lo guarde: así no entra al histórico sin revisar
+    assert leer_flujo(a.flujo).sin_revisar
 
 
 def test_tc_invalido_da_error_claro(tmp_path):

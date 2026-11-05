@@ -15,6 +15,7 @@ from flujos.armado.fuentes import asignar_hojas, leer_clasificado, nombre_salida
 from flujos.armado.guardar import guardar_con_valores
 from flujos.armado.overnight import cruzan, hoja_over
 from flujos.armado.rodar import ABREV, NOMBRES
+from flujos.lectura.flujos import SIN_REVISAR
 from flujos.lectura.normalizar import norm
 from flujos.reportes.notas import DatosNotas, escribir_notas, variaciones_total
 from flujos.validacion.evaluador import Evaluador
@@ -148,6 +149,7 @@ def armar_flujo(clasificado: str, plantilla: str, empresa: str, anio: int, mes: 
                   if x and x in base), NOMBRES[mes_anterior])
     nombre = nombre_salida(plantilla_nombre, viejo, NOMBRES[mes])
     ruta_flujo = os.path.join(salida, nombre)
+    wb.properties.lastModifiedBy = SIN_REVISAR
     guardar_con_valores(wb, ruta_flujo, ev)
 
     controles: list[Control] = []

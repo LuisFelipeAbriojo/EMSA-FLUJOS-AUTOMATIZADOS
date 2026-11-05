@@ -22,7 +22,7 @@ def _columna_concepto(n: list[str]) -> int | None:
     return next((j for j, x in enumerate(n) if x.startswith(ALIAS_CONCEPTO)), None)
 
 
-def _fecha(v: Any) -> dt.date | None:
+def leer_fecha(v: Any) -> dt.date | None:
     if isinstance(v, dt.datetime):
         return v.date()
     if isinstance(v, dt.date):
@@ -104,7 +104,7 @@ def leer_con_overnights(ruta: str, anio: int, mes: int,
         fechadas = []
         for k, r in enumerate(filas[i0 + 1:], start=i0 + 2):
             r = list(r) + [None] * 20
-            f = _fecha(r[c['FECHA']])
+            f = leer_fecha(r[c['FECHA']])
             if f is None:
                 if not r[c['CONCEPTO']] and not _num(r[c['DEBE']]) and not _num(r[c['HABER']]):
                     vacias += 1

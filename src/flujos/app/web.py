@@ -5,6 +5,7 @@ en /salida. Nada se envía a ningún servidor.
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import os
 import shutil
@@ -21,7 +22,9 @@ from flujos.clasificacion.clasificar import clasificar as _clasificar
 from flujos.clasificacion.entrenar import entrenar
 from flujos.clasificacion.modelo import Clasificador, cargar_modelo, guardar_modelo
 from flujos.historico.actualizar import actualizar as _actualizar
+from flujos.historico.desde_flujos import abrir_zip, incorporar, resumen_numeros, validar_historico
 from flujos.lectura.normalizar import empresa_de
+from flujos.reportes.reporte_historico import escribir_reporte
 
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
@@ -55,9 +58,9 @@ def _con_avisos(avisar: Aviso):
         raiz.setLevel(nivel)
 
 
-def _vaciar_salida(ruta: str = SALIDA) -> None:
-    shutil.rmtree(ruta, ignore_errors=True)
-    os.makedirs(ruta)
+def _vaciar_salida() -> None:
+    shutil.rmtree(SALIDA, ignore_errors=True)
+    os.makedirs(SALIDA)
 
 
 def _info_modelo() -> dict[str, Any]:
@@ -157,6 +160,46 @@ def armar_flujos(rutas: Iterable[str], anio: int, mes: int, tc: float, avisar: A
             for x in archivos:
                 z.write(f'{SALIDA}/{x}', x)
     return salida
+
+
+def actualizar_historico(rutas: Iterable[str], avisar: Aviso) -> dict[str, Any]:
+    """Con el historico.csv vigente y los flujos corregidos (.zip o .xlsx): histórico nuevo, reporte y modelo reentrenado."""
+    global MODELO, HIST
+    _vaciar_salida()
+    rutas = list(rutas)
+    csvs = [r for r in rutas if r.lower().endswith('.csv')]
+    if len(csvs) != 1:
+        raise ValueError('Sube un solo historico.csv: el vigente, el que está en el disco compartido.')
+    h = pd.read_csv(csvs[0], low_memory=False)
+    validar_historico(h)
+    flujos = [r for r in rutas if r.lower().endswith('.xlsx') and not os.path.basename(r).startswith('~$')]
+    temporal = '/tmp/flujos_zip'
+    shutil.rmtree(temporal, ignore_errors=True)
+    ignorados: list[str] = []
+    for i, r in enumerate(x for x in rutas if x.lower().endswith('.zip')):
+        de_este, otros = abrir_zip(r, f'{temporal}/{i}')
+        flujos += de_este
+        ignorados += otros
+    if not flujos:
+        raise ValueError('No encontré flujos: sube un .zip con los RESUMEN FLUJO corregidos del mes.')
+    if ignorados:
+        avisar(f'Dentro del .zip ignoré lo que no es Excel: {", ".join(ignorados)}.')
+    avisar(f'Leyendo {len(flujos)} archivos...')
+    with _con_avisos(avisar):
+        res = incorporar(flujos, h)
+    shutil.rmtree(temporal, ignore_errors=True)
+    fecha = dt.date.today().isoformat()
+    escribir_reporte(f'{SALIDA}/REPORTE HISTORICO {fecha}.xlsx', res, fecha)
+    if res.incorporados:
+        HIST = res.historico
+        HIST.to_csv(f'{SALIDA}/historico_{fecha}.csv', index=False)
+        avisar(f'Histórico actualizado: {len(HIST):,} movimientos. Reentrenando el modelo (unos minutos)...')
+        MODELO, _ = entrenar(HIST)
+        guardar_modelo(MODELO, f'{SALIDA}/modelo_web.pkl')
+        avisar('Modelo reentrenado.')
+    filas = [dict(empresa=x.empresa, periodo=x.periodo, accion=x.accion, antes=x.antes, ahora=x.ahora) for x in res.incorporados]
+    return dict(**resumen_numeros(res), filas=filas, rechazos=[dict(archivo=a, motivo=m) for a, m in res.rechazados],
+                modelo=_info_modelo() if res.incorporados else None)
 
 
 def reentrenar(avisar: Aviso) -> dict[str, Any]:

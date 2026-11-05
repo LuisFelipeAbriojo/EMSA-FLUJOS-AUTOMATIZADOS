@@ -3,7 +3,7 @@ import datetime as dt
 import openpyxl
 import pytest
 
-from flujos.lectura.libros import _fecha, leer_empresa
+from flujos.lectura.libros import leer_empresa, leer_fecha
 from sinteticos import D, hoja_libro, libro_basico
 
 
@@ -28,13 +28,13 @@ def _diferencia(c):
     ('12.09.26', dt.date(2026, 9, 12)),
     ('8-Aug-26', dt.date(2026, 8, 8)),
 ])
-def test_fechas_escritas_a_mano(texto, esperado):
-    assert _fecha(texto) == esperado
+def testleer_fechas_escritas_a_mano(texto, esperado):
+    assert leer_fecha(texto) == esperado
 
 
 @pytest.mark.parametrize('texto', ['TOTAL', '31-02-2026', '1-XYZ-26', ''])
-def test_fechas_invalidas(texto):
-    assert _fecha(texto) is None
+def testleer_fechas_invalidas(texto):
+    assert leer_fecha(texto) is None
 
 
 def test_solo_toma_el_mes_y_cuadra(tmp_path):
@@ -131,9 +131,9 @@ def test_libro_con_formato_elsa(tmp_path, columna):
     assert (cu.iloc[0].saldo_inicial, cu.iloc[0].saldo_final) == (1000.0, 1060.0)
 
 
-def test_fecha_con_el_anio_primero():
-    assert _fecha('2026.09.01') == dt.date(2026, 9, 1)
-    assert _fecha('2026-09-01') == dt.date(2026, 9, 1)
+def testleer_fecha_con_el_anio_primero():
+    assert leer_fecha('2026.09.01') == dt.date(2026, 9, 1)
+    assert leer_fecha('2026-09-01') == dt.date(2026, 9, 1)
 
 
 def test_filas_sueltas_bajo_bloque_vacio_se_marcan(tmp_path):

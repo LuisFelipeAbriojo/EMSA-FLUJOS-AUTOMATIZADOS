@@ -33,10 +33,12 @@ def _flujo_cerrado(ruta):
 def test_extraer_toma_las_secciones_como_categoria(tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger='flujos'):
         filas = extraer(_flujo_cerrado(tmp_path / 'RESUMEN FLUJO ICP SETIEMBRE 2026.xlsx'))
-    assert [(f['concepto'], f['categoria'], f['tipo']) for f in filas] == [
-        ('DEPOSITO ALFA', 'DEPOSITOS', 'INGRESO'), ('BCR AL BCP', 'CARGO TRANSF. CTAS', 'EGRESO')]
+    assert [(f['concepto'], f['categoria'], f['tipo'], f['fecha']) for f in filas] == [
+        ('DEPOSITO ALFA', 'DEPOSITOS', 'INGRESO', '2026-09-01'),
+        ('DEPOSITO FECHA EN TEXTO', 'DEPOSITOS', 'INGRESO', '2026-09-05'),
+        ('BCR AL BCP', 'CARGO TRANSF. CTAS', 'EGRESO', '2026-09-02')]
     assert {f['periodo'] for f in filas} == {'2026-09'}
-    assert '1 filas omitidas' in caplog.text
+    assert 'omitidas' not in caplog.text
 
 
 def test_extraer_ignora_proyectado(tmp_path):
