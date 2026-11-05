@@ -30,7 +30,8 @@ Con el umbral de 90 % se revisa ~2,5 % de las filas, y el resto acierta 99,6 %.
 - El ITF que viene en la misma fila (BBVA y otros) se separa y va siempre a la categoría ITF.
 - En ABONO / CARGO TRANSF. CTAS ordena por tipo de operación (overnight → BCR → cambio de moneda → fondos mutuos → otros)
   y luego por fecha. El orden se cambia en `TIPOS_OPERACION` de `comun.py`.
-- Verifica que los saldos cuadren por cuenta.
+- Verifica que los saldos cuadren por cuenta. Si una fila o un bloque tiene un mes distinto al de las filas de arriba y abajo
+  (fecha mal digitada), se cuenta según su ubicación en el libro, se marca en amarillo y se lista en RESUMEN → FECHAS SOSPECHOSAS.
 
 | Archivo | Qué hace |
 |---|---|

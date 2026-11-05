@@ -37,7 +37,8 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
             otra = mov[(mov.hoja == mov.hoja[i]) & (mov.fila_origen == mov.fila_origen[i]) & (mov.index != i)]
             if len(otra):
                 mov.loc[i, 'tipo_seccion'] = otra.tipo.iloc[0]
-    mov['revisar'] = (mov.confianza < umbral)
+    mov['revisar'] = (mov.confianza < umbral) | mov.get('aviso', pd.Series('', index=mov.index)).fillna('') \
+        .astype(str).str.contains('Fecha en el libro')
     secs = secciones(mov, modelo, empresa)
     wb = Workbook()
 
@@ -73,6 +74,13 @@ def escribir(ruta, empresa, anio, mes, mov, cuentas, modelo, umbral):
     sin = cuentas[cuentas.movimientos == 0].hoja.tolist()
     if sin:
         ws.cell(fin + 1, 1, 'Cuentas sin movimientos en el mes: ' + ', '.join(sin)).font = Font(italic=True, color='666666')
+    alertas = [x for a in cuentas.get('alertas', pd.Series(dtype=str)).fillna('') for x in a.split(' | ') if x]
+    if alertas:
+        ws.cell(fin + 2, 1, 'FECHAS SOSPECHOSAS EN EL LIBRO (conviene corregirlas en el libro bancos):').font = \
+            Font(bold=True, color='C00000')
+        for i, x in enumerate(alertas):
+            ws.cell(fin + 3 + i, 1, '• ' + x).font = Font(color='C00000')
+        fin += 2 + len(alertas)
 
     # matriz categoría x cuenta con SUMIFS (se recalcula si corrigen MOVIMIENTOS)
     f0 = fin + 3

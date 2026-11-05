@@ -69,7 +69,10 @@ def leer_empresa(ruta, anio, mes, empresa=None):
         cuenta = next((m.group(0) for m in [re.search(r'(CTA|CUENTA)[^/]*?N\S*\s*[\d\- ]{6,}', texto_cab)] if m), '')
         mon = moneda(ws.title, texto_cab)
         saldo_ini, saldo_fin, n_mov, deb, hab = None, None, 0, 0.0, 0.0
+        visto_mes = False  # el saldo inicial es el de la fila justo antes del primer movimiento del mes
         vacias, suelto = 0, False   # filas debajo de un bloque vacío = posibles proyectados
+        # 1ª pasada: filas con fecha, para detectar fechas fuera de lugar
+        fechadas = []
         for k, r in enumerate(filas[i0 + 1:], start=i0 + 2):
             r = list(r) + [None] * 20
             f = _fecha(r[c['FECHA']])
@@ -77,26 +80,62 @@ def leer_empresa(ruta, anio, mes, empresa=None):
                 if not r[c['CONCEPTO']] and not _num(r[c['DEBE']]) and not _num(r[c['HABER']]):
                     vacias += 1
                 continue
-            if vacias >= 3 and saldo_ini is not None:
-                suelto = True
+            fechadas.append([k, r, f, vacias])
             vacias = 0
+        # Una fila cuyo mes no coincide con el de las filas de arriba y de abajo (que sí coinciden entre sí)
+        # está mal fechada (ej. 08/09 en vez de 09/08). El saldo del libro la cuenta donde está ubicada,
+        # así que se asigna al mes de sus vecinas y se avisa.
+        # También bloques: varias filas seguidas con otro mes (ej. 17 filas "21/08" en medio del 21/09).
+        ym = lambda x: x.year * 12 + x.month
+        alertas = []
+        tramos = []  # [inicio, fin) de filas consecutivas con el mismo mes
+        for i, it in enumerate(fechadas):
+            if tramos and ym(fechadas[tramos[-1][0]][2]) == ym(it[2]):
+                tramos[-1][1] = i + 1
+            else:
+                tramos.append([i, i + 1])
+        for t in range(1, len(tramos) - 1):
+            (pa, pb), (a0, a1), (na, nb) = tramos[t - 1], tramos[t], tramos[t + 1]
+            antes, despues = fechadas[pb - 1][2], fechadas[na][2]
+            largo = a1 - a0
+            if ym(antes) == ym(despues) and largo <= 40 and largo < (pb - pa) + (nb - na):
+                for i in range(a0, a1):
+                    f = fechadas[i][2]
+                    fechadas[i].append(f)              # fecha original
+                    fechadas[i][2] = antes             # el mes que le da su ubicación en el libro
+                f = fechadas[a0][4]
+                if ini_mes <= f < fin_mes or ini_mes <= antes < fin_mes:
+                    filas_txt = (f'fila {fechadas[a0][0]}' if largo == 1
+                                 else f'filas {fechadas[a0][0]}-{fechadas[a1 - 1][0]} ({largo} movimientos)')
+                    alertas.append(f'{ws.title} {filas_txt}: fecha {f:%d/%m/%Y} entre movimientos del '
+                                   f'{antes:%d/%m/%Y}; se toma como {antes:%m/%Y} por su ubicación '
+                                   f'(¿mes mal digitado?)')
+        for item in fechadas:
+            k, r, f, vac = item[:4]
+            f_orig = item[4] if len(item) > 4 else None
+            if vac >= 3 and saldo_ini is not None:
+                suelto = True
             s = _num(r[c['SALDO']]) if 'SALDO' in c else None
             if f < ini_mes:
-                if s is not None:
+                if s is not None and not visto_mes:
                     saldo_ini = s
                 continue
             if f >= fin_mes:
                 continue
+            visto_mes = True
             concepto = str(r[c['CONCEPTO']] or '').strip()
             d, h = _num(r[c['DEBE']]), _num(r[c['HABER']])
             if s is not None and not suelto:
                 saldo_fin = s
             if norm(concepto).startswith('CIERRE AL'):
                 continue
+            aviso = 'Fila suelta al final de la hoja (¿proyectado?)' if suelto else ''
+            if f_orig:
+                aviso = (aviso + f' Fecha en el libro: {f_orig:%d/%m/%Y}, fuera de orden; se toma como de este mes '
+                                 f'por su ubicación (revisar la fecha).').strip()
             base = dict(empresa=empresa, hoja=ws.title, cuenta=cuenta, banco=banco(ws.title), moneda=mon,
-                        fecha=f, concepto=concepto, cheque=r[cch] if cch is not None else None,
-                        operacion=r[cop] if cop is not None else None, fila_origen=k,
-                        aviso='Fila suelta al final de la hoja (¿proyectado?)' if suelto else '')
+                        fecha=f_orig or f, concepto=concepto, cheque=r[cch] if cch is not None else None,
+                        operacion=r[cop] if cop is not None else None, fila_origen=k, aviso=aviso)
             # BBVA y otros: el ITF viene en la misma fila que el movimiento (DEBE y HABER a la vez, ~0.005%)
             itf = None
             if d and h and min(d, h) / max(d, h) <= 0.0001:
@@ -113,5 +152,5 @@ def leer_empresa(ruta, anio, mes, empresa=None):
             saldo_fin = saldo_ini
         cuentas.append(dict(empresa=empresa, hoja=ws.title, cuenta=cuenta, banco=banco(ws.title), moneda=mon,
                             saldo_inicial=saldo_ini or 0.0, ingresos=round(deb, 2), egresos=round(hab, 2),
-                            saldo_final=saldo_fin or 0.0, movimientos=n_mov))
+                            saldo_final=saldo_fin or 0.0, movimientos=n_mov, alertas=' | '.join(alertas)))
     return pd.DataFrame(movs), pd.DataFrame(cuentas)

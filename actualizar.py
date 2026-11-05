@@ -33,6 +33,10 @@ def actualizar(archivos, h, modelo, umbral=0.9, avisar=print):
             cuentas.append(dict(hoja=r[0], cuenta=r[1], moneda=r[2], saldo_inicial=r[3], ingresos=r[4], egresos=r[5],
                                 saldo_final=r[7], movimientos=r[9]))
         cuentas = pd.DataFrame(cuentas)
+        # las fechas sospechosas siguen siendo del libro: se conservan al rehacer el RESUMEN
+        alertas = [c[2:] for c, in ws.iter_rows(max_col=1, values_only=True) if isinstance(c, str) and c.startswith('• ')]
+        cuentas['alertas'] = ''
+        cuentas.loc[0, 'alertas'] = ' | '.join(alertas)
         mov = pd.DataFrame(dict(
             empresa=emp, hoja=mv.CUENTA, moneda=mv.MONEDA, fecha=pd.to_datetime(mv.FECHA).dt.date, concepto=mv.CONCEPTO,
             tipo=mv.TIPO, monto=mv.MONTO, categoria=mv.CATEGORIA.astype(str).str.strip().str.upper(),
