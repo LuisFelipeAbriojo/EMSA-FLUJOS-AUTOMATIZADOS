@@ -18,7 +18,10 @@ function llamar(accion, args, archivos = []) {
   return new Promise((ok, mal) => { pendientes[id] = { ok, mal }; worker.postMessage({ id, accion, args, archivos }); });
 }
 async function leer(files) {
-  return Promise.all([...files].map(async f => ({ nombre: f.name, bytes: await f.arrayBuffer() })));
+  return Promise.all([...files].map(async f => {
+    try { return { nombre: f.name, bytes: await f.arrayBuffer() }; }
+    catch { throw new Error(`No pude leer ${f.name}: quizá cambió después de elegirlo. Vuelve a elegirlo y reemplazará al anterior.`); }
+  }));
 }
 
 // ---------- utilidades de interfaz ----------
@@ -56,17 +59,46 @@ function zona(inputId, alCambiar) {
   inp.addEventListener('change', () => { alCambiar([...inp.files]); inp.value = ''; });
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
+const esXlsx = (f) => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$');
+// Cada selección se suma a las anteriores. Un archivo con el mismo nombre reemplaza al que ya estaba.
+function seleccion(inputId, listaId, admite) {
+  const archivos = [], ul = $(listaId);
+  const pintar = () => {
+    ul.innerHTML = archivos.map((f, i) =>
+      `<li>📄 ${esc(f.name)} <button type="button" class="quitar" data-i="${i}" aria-label="Quitar ${esc(f.name)}">✕</button></li>`).join('') +
+      (archivos.length > 1 ? '<li><button type="button" class="quitar" data-todos="1">Quitar todos</button></li>' : '');
+    actualizarBotones();
+  };
+  ul.addEventListener('click', (e) => {
+    const b = e.target.closest('button.quitar');
+    if (!b) return;
+    archivos.splice(b.dataset.todos ? 0 : Number(b.dataset.i), b.dataset.todos ? archivos.length : 1);
+    pintar();
+  });
+  zona(inputId, (files) => {
+    for (const f of files.filter(admite)) {
+      const i = archivos.findIndex(x => x.name === f.name);
+      if (i >= 0) archivos[i] = f; else archivos.push(f);
+    }
+    pintar();
+  });
+  return archivos;
+}
 
-let motorListo = false, hayModelo = false, libros = [], revisados = [], archivosA = [], archivosH = [];
+let motorListo = false, hayModelo = false;
+const libros = seleccion('f2', 'l2', esXlsx);
+const revisados = seleccion('fR', 'lR', esXlsx);
+const archivosA = seleccion('fA', 'lA', esXlsx);
+const archivosH = seleccion('fH', 'lH', f => /\.(zip|csv|xlsx)$/i.test(f.name) && !f.name.startsWith('~$'));
 function actualizarBotones() {
   $('s2').classList.toggle('bloqueado', !hayModelo);
   $('b2').disabled = ocupado || !libros.length;
   $('bR').disabled = ocupado || !revisados.length;
   const tc = Number($('tcA').value);
   $('bA').disabled = ocupado || !motorListo || !archivosA.length || !(tc > 2 && tc < 6);
-  const hayCsv = archivosH.filter(f => /\.csv$/i.test(f.name)).length === 1;
-  $('bH').disabled = ocupado || !motorListo || !hayCsv || !archivosH.some(f => /\.(zip|xlsx)$/i.test(f.name));
+  const csv = archivosH.filter(f => /\.csv$/i.test(f.name)).length;
+  $('aH').hidden = csv < 2;
+  $('bH').disabled = ocupado || !motorListo || csv !== 1 || !archivosH.some(f => /\.(zip|xlsx)$/i.test(f.name));
   $('usarCache').disabled = ocupado || !motorListo;
 }
 
@@ -130,10 +162,6 @@ $('usarCache').onclick = async () => {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
   $('mes').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 })();
-zona('f2', (files) => {
-  libros = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
-  lista('l2', libros); actualizarBotones();
-});
 $('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
   const [anio, mes] = $('mes').value.split('-').map(Number);
   const umbral = Number($('umbral').value) / 100;
@@ -158,10 +186,6 @@ $('b2').onclick = () => trabajar('i2', 'Clasificando…', async (info) => {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
   $('mesA').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 })();
-zona('fA', (files) => {
-  archivosA = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
-  lista('lA', archivosA); actualizarBotones();
-});
 $('tcA').addEventListener('input', () => actualizarBotones());
 $('bA').onclick = () => trabajar('iA', 'Armando el flujo… puede tardar un par de minutos por empresa.', async (info) => {
   const [anio, mes] = $('mesA').value.split('-').map(Number);
@@ -186,10 +210,6 @@ $('bA').onclick = () => trabajar('iA', 'Armando el flujo… puede tardar un par 
 });
 
 // ---------- opcional del paso 2: rehacer las hojas por cuenta ----------
-zona('fR', (files) => {
-  revisados = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
-  lista('lR', revisados); actualizarBotones();
-});
 $('bR').onclick = () => trabajar('iR', 'Actualizando las hojas por cuenta…', async (info) => {
   const r = await llamar('rehacer_clasificados', ['$rutas', Number($('umbral').value) / 100], await leer(revisados));
   info.className = 'info ok';
@@ -198,10 +218,6 @@ $('bR').onclick = () => trabajar('iR', 'Actualizando las hojas por cuenta…', a
 });
 
 // ---------- paso 4 ----------
-zona('fH', (files) => {
-  archivosH = files.filter(f => /\.(zip|csv|xlsx)$/i.test(f.name) && !f.name.startsWith('~$'));
-  lista('lH', archivosH); actualizarBotones();
-});
 $('bH').onclick = () => trabajar('iH', 'Actualizando el histórico… el reentrenamiento puede tardar unos minutos.', async (info) => {
   $('tH').innerHTML = ''; $('dH').innerHTML = '';
   const r = await llamar('actualizar_historico', ['$rutas'], await leer(archivosH));

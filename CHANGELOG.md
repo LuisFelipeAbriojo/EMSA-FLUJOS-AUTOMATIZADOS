@@ -9,6 +9,9 @@
 - Control de líneas de la hoja mensual que no llegan a TOTAL.
 - Aviso de diferencia entre el saldo final de TOTAL y el de la hoja mensual.
 
+### Cambiado
+- Al subir archivos, cada selección se suma a las anteriores, así se pueden elegir desde distintas carpetas. La lista permite quitar uno o todos.
+
 ## 0.3.0
 ### Agregado
 - Paso **Actualizar histórico**: recibe un `.zip` con flujos corregidos y el `historico.csv` vigente, y entrega el histórico con fecha, un reporte y el modelo reentrenado.

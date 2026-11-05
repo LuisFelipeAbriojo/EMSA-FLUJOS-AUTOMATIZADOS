@@ -37,6 +37,8 @@
   .zona input { display: none; }
   .lista { margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
   .lista li { padding: 2px 0; overflow-wrap: anywhere; }
+  button.quitar { background: none; color: var(--muted); font-weight: 400; font-size: 13px; padding: 0 6px; }
+  button.quitar:hover { color: var(--bad); }
   .fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 12px; }
   label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
   input[type=month], input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
