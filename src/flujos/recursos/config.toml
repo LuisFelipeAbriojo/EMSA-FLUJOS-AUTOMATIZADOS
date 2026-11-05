@@ -21,7 +21,7 @@ codigo = "IBK"
 claves = ["IBK"]
 [[bancos]]
 codigo = "BIF"
-claves = ["BIF"]
+claves = ["BIF", "BANBIF"]
 [[bancos]]
 codigo = "SANT"
 claves = ["SANT"]

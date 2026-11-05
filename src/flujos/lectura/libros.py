@@ -12,6 +12,14 @@ import pandas as pd
 from flujos.lectura.normalizar import banco, empresa_de, moneda, norm
 
 COLS = ['FECHA', 'CONCEPTO', 'DEBE', 'HABER', 'SALDO']
+# ELSA llama de otra forma a la columna del concepto
+ALIAS_CONCEPTO = ('DESCRIPCION', 'CLIENTE')
+
+
+def _columna_concepto(n: list[str]) -> int | None:
+    if 'CONCEPTO' in n:
+        return n.index('CONCEPTO')
+    return next((j for j, x in enumerate(n) if x.startswith(ALIAS_CONCEPTO)), None)
 
 
 def _fecha(v: Any) -> dt.date | None:
@@ -22,8 +30,11 @@ def _fecha(v: Any) -> dt.date | None:
     if isinstance(v, str):
         s = norm(v)
         m = re.fullmatch(r'(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})', s)
+        al_reves = re.fullmatch(r'(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})', s)  # 2026.09.01
         if m:
             d, mo, a = map(int, m.groups())
+        elif al_reves:
+            a, mo, d = map(int, al_reves.groups())
         else:  # fechas escritas a mano: 1-SET-26, 26-APR-29, 5 OCT 2026
             m = re.fullmatch(r'(\d{1,2})[\-/ .]*([A-Z]{3})[A-Z]*[\-/ .]*(\d{2,4})', s)
             if not m or m.group(2) not in _MESES:
@@ -64,13 +75,14 @@ def leer_empresa(ruta: str, anio: int, mes: int, empresa: str | None = None) -> 
         cab = None
         for i, r in enumerate(filas[:15]):
             n = [norm(x) if x is not None else '' for x in r]
-            if 'FECHA' in n and 'CONCEPTO' in n and 'DEBE' in n:
+            if 'FECHA' in n and 'DEBE' in n and _columna_concepto(n) is not None:
                 cab = (i, n)
                 break
         if not cab:
             continue  # hojas de saldos, cheques, tipo de cambio, etc.
         i0, n = cab
         c = {k: n.index(k) for k in COLS if k in n}
+        c['CONCEPTO'] = _columna_concepto(n)
         cch = next((j for j, x in enumerate(n) if x.startswith('CH/')), None)
         cop = next((j for j, x in enumerate(n) if 'OPERACION' in x), None)
         texto_cab = ' '.join(norm(x) for r in filas[:i0] for x in r if x is not None)
