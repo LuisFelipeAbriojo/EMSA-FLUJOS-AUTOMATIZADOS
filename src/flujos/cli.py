@@ -16,8 +16,8 @@ from flujos.armado.proceso import armar_flujo
 from flujos.clasificacion.clasificar import clasificar, mes_anterior
 from flujos.clasificacion.entrenar import entrenar
 from flujos.clasificacion.modelo import cargar_modelo, guardar_modelo
+from flujos.clasificacion.rehacer import rehacer
 from flujos.config import cargar
-from flujos.historico.actualizar import actualizar
 from flujos.historico.desde_flujos import abrir_zip, incorporar
 from flujos.lectura.flujos import extraer
 from flujos.reportes.reporte_historico import escribir_reporte
@@ -41,10 +41,8 @@ def _cmd_clasificar(a: argparse.Namespace) -> None:
     clasificar(archivos, anio, mes, cargar_modelo(a.modelo), a.salida, a.umbral)
 
 
-def _cmd_actualizar(a: argparse.Namespace) -> None:
-    h = pd.read_csv(a.historico) if os.path.exists(a.historico) else pd.DataFrame()
-    actualizar(a.archivos, h, cargar_modelo(a.modelo), a.umbral).to_csv(a.historico, index=False)
-    log.info('Histórico actualizado: %s. Ahora vuelve a entrenar el modelo.', a.historico)
+def _cmd_rehacer(a: argparse.Namespace) -> None:
+    rehacer(a.archivos, cargar_modelo(a.modelo), a.umbral)
 
 
 def _cmd_armar(a: argparse.Namespace) -> None:
@@ -115,12 +113,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--umbral', type=float, default=umbral)
     p.set_defaults(fn=_cmd_clasificar)
 
-    p = sub.add_parser('actualizar', help='rehace los Excel revisados y agrega el mes al histórico')
+    p = sub.add_parser('rehacer', help='rehace las hojas por cuenta de los Excel clasificados ya revisados')
     p.add_argument('archivos', nargs='+')
-    p.add_argument('--historico', required=True)
     p.add_argument('--modelo', required=True)
     p.add_argument('--umbral', type=float, default=umbral)
-    p.set_defaults(fn=_cmd_actualizar)
+    p.set_defaults(fn=_cmd_rehacer)
 
     p = sub.add_parser('armar', help='arma el flujo del mes de una empresa')
     p.add_argument('clasificado')

@@ -21,7 +21,7 @@ from flujos.armado.proceso import armar_flujo
 from flujos.clasificacion.clasificar import clasificar as _clasificar
 from flujos.clasificacion.entrenar import entrenar
 from flujos.clasificacion.modelo import Clasificador, cargar_modelo, guardar_modelo
-from flujos.historico.actualizar import actualizar as _actualizar
+from flujos.clasificacion.rehacer import rehacer as _rehacer
 from flujos.historico.desde_flujos import abrir_zip, incorporar, resumen_numeros, validar_historico
 from flujos.lectura.normalizar import empresa_de
 from flujos.reportes.reporte_historico import escribir_reporte
@@ -105,24 +105,17 @@ def clasificar(rutas: Iterable[str], anio: int, mes: int, umbral: float, avisar:
     return hechos
 
 
-def actualizar(rutas: Iterable[str], ruta_historico: str | None, umbral: float, avisar: Aviso) -> dict[str, Any]:
-    """Rehace los Excel revisados y devuelve el histórico con esos meses agregados."""
-    global HIST
+def rehacer_clasificados(rutas: Iterable[str], umbral: float, avisar: Aviso) -> dict[str, Any]:
+    """Rehace las hojas por cuenta de los Excel clasificados con las categorías corregidas."""
     _vaciar_salida()
-    if ruta_historico:
-        HIST = pd.read_csv(ruta_historico)
-    if HIST is None:
-        raise ValueError('Falta historico.csv: cárgalo en el paso 1 o junto con los Excel revisados.')
     copias = []
     for r in rutas:
         destino = f'{SALIDA}/{os.path.basename(r)}'
         shutil.copy(r, destino)
         copias.append(destino)
     with _con_avisos(avisar):
-        HIST = _actualizar(copias, HIST, MODELO, float(umbral))
-    HIST.to_csv(f'{SALIDA}/historico.csv', index=False)
-    avisar(f'Histórico actualizado: {len(HIST):,} movimientos.')
-    return dict(movimientos=len(HIST))
+        _rehacer(copias, MODELO, float(umbral))
+    return dict(archivos=len(copias))
 
 
 def armar_flujos(rutas: Iterable[str], anio: int, mes: int, tc: float, avisar: Aviso) -> list[dict[str, Any]]:
@@ -140,7 +133,8 @@ def armar_flujos(rutas: Iterable[str], anio: int, mes: int, tc: float, avisar: A
             anteriores[empresa] = r
     salida = []
     with _con_avisos(avisar):
-        for empresa, clasificado in sorted(clasificados.items()):
+        for n, (empresa, clasificado) in enumerate(sorted(clasificados.items()), 1):
+            avisar(f'Armando {empresa} ({n} de {len(clasificados)})...')
             anterior = anteriores.get(empresa)
             if anterior is None:
                 salida.append(dict(empresa=empresa, error=f'Falta el RESUMEN FLUJO del mes anterior de {empresa}.'))
@@ -200,13 +194,3 @@ def actualizar_historico(rutas: Iterable[str], avisar: Aviso) -> dict[str, Any]:
     filas = [dict(empresa=x.empresa, periodo=x.periodo, accion=x.accion, antes=x.antes, ahora=x.ahora) for x in res.incorporados]
     return dict(**resumen_numeros(res), filas=filas, rechazos=[dict(archivo=a, motivo=m) for a, m in res.rechazados],
                 modelo=_info_modelo() if res.incorporados else None)
-
-
-def reentrenar(avisar: Aviso) -> dict[str, Any]:
-    global MODELO
-    _vaciar_salida()
-    avisar('Reentrenando con el histórico actualizado...')
-    MODELO, _ = entrenar(HIST)
-    guardar_modelo(MODELO, f'{SALIDA}/modelo_web.pkl')
-    avisar('Modelo reentrenado.')
-    return _info_modelo()

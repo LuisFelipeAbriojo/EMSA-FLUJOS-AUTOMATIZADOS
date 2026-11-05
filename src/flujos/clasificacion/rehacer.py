@@ -1,4 +1,4 @@
-"""Después de revisar: rehace las hojas por cuenta y agrega el mes al histórico para que el modelo aprenda."""
+"""Después de revisar: rehace las hojas por cuenta del Excel clasificado con las categorías corregidas."""
 from __future__ import annotations
 
 import logging
@@ -10,15 +10,13 @@ from typing import Any
 import openpyxl
 import pandas as pd
 
-from flujos.lectura.normalizar import banco
 from flujos.reportes.excel_clasificado import MESES, escribir
 
 log = logging.getLogger(__name__)
 
 
-def actualizar(archivos: Iterable[str], h: pd.DataFrame, modelo: Any, umbral: float = 0.9) -> pd.DataFrame:
-    """Rehace cada archivo revisado en su sitio y devuelve el histórico h con esos meses agregados."""
-    nuevos = []
+def rehacer(archivos: Iterable[str], modelo: Any, umbral: float = 0.9) -> None:
+    """Rehace cada archivo revisado en su sitio. El histórico no cambia: solo aprende de los flujos entregados."""
     for f in archivos:
         nombre = os.path.basename(f)
         emp = nombre.split()[0]
@@ -54,19 +52,4 @@ def actualizar(archivos: Iterable[str], h: pd.DataFrame, modelo: Any, umbral: fl
         mov.loc[mov.confianza < umbral, ['confianza', 'origen']] = [1.0, 'revisado']
         overnights = pd.read_excel(f, sheet_name='OVERNIGHTS') if 'OVERNIGHTS' in wb.sheetnames else None
         escribir(f, emp, anio, mes, mov, cuentas, modelo, umbral, overnights)
-        nuevos.append(pd.DataFrame(dict(
-            itf_misma_fila=mov.itf_misma_fila, empresa=emp, periodo=f'{anio}-{mes:02d}', hoja=mov.hoja,
-            banco=mov.hoja.map(banco), moneda=mov.moneda, fecha=mov.fecha.astype(str), concepto=mov.concepto,
-            tipo=mov.tipo, monto=mov.monto, categoria=mov.categoria,
-            orden=[modelo.orden_de(emp, t, c) for t, c in zip(mov.tipo, mov.categoria, strict=True)],
-            archivo=os.path.basename(f), fuente='revision')))
-        log.info('%s: hojas por cuenta rehechas; %d movimientos listos para el histórico.', emp, len(mov))
-
-    h = h.copy()
-    if 'fuente' not in h:
-        h['fuente'] = 'flujo cerrado'
-    n = pd.concat(nuevos)
-    clave = set(zip(n.empresa, n.periodo, strict=True))
-    pares = pd.Series(list(zip(h.empresa, h.periodo, strict=True)), dtype=object)
-    h = h[~pares.isin(clave).values | (h.fuente != 'revision')]
-    return pd.concat([h, n])
+        log.info('%s: hojas por cuenta rehechas con %d movimientos.', emp, len(mov))

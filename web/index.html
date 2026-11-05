@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clasificador de Flujos</title>
+<title>Flujos de Caja</title>
 <style>/*__ESTILOS__*/</style>
 </head>
 <body>
 <main>
-  <h1>Clasificador de flujos de caja</h1>
-  <p class="sub">Clasifica los movimientos del mes desde los libros bancos y arma el Excel por empresa.</p>
+  <h1>Flujos de caja</h1>
+  <p class="sub">Del libro bancos al RESUMEN FLUJO de cada empresa, en cuatro pasos.</p>
   <div class="privado">🔒 Tus archivos no salen de esta computadora. Todo se procesa dentro del navegador;
     internet solo se usa para descargar el motor la primera vez.</div>
   <div class="motor"><span class="punto" id="punto"></span><span id="estadoMotor">Preparando el motor (Python en el navegador)… la primera vez tarda unos segundos.</span></div>
@@ -25,8 +25,9 @@
   </section>
 
   <section id="s2" class="bloqueado">
-    <div class="cab"><span class="num">2</span><h2>Libros bancos del mes</h2></div>
-    <p class="ayuda">Un .xlsx por empresa (por ejemplo <i>ICP OCT 2026.xlsx</i>). El nombre del archivo debe incluir la empresa.</p>
+    <div class="cab"><span class="num">2</span><h2>Clasificar</h2></div>
+    <p class="ayuda">Sube los libros bancos del mes, un .xlsx por empresa (por ejemplo <i>ICP OCT 2026.xlsx</i>). El nombre del archivo debe incluir la empresa.
+      Luego <b>revisa las categorías en la hoja MOVIMIENTOS</b> de cada Excel clasificado, sobre todo las filas amarillas.</p>
     <div class="zona" data-input="f2"><input type="file" id="f2" accept=".xlsx" multiple>Arrastra aquí los libros o haz clic para elegirlos</div>
     <ul class="lista" id="l2"></ul>
     <div class="fila">
@@ -37,12 +38,22 @@
     <div class="info" id="i2"></div>
     <div class="tabla" id="t2"></div>
     <div class="descargas" id="d2"></div>
+    <details class="opcional"><summary>Opcional: actualizar las hojas por cuenta después de corregir</summary>
+      <p class="ayuda">Si quieres ver tus correcciones también en las hojas por cuenta del Excel clasificado, súbelo aquí.
+        No hace falta para armar el flujo, que lee directamente la hoja MOVIMIENTOS.</p>
+      <div class="zona" data-input="fR"><input type="file" id="fR" accept=".xlsx" multiple>Arrastra aquí los Excel clasificados ya corregidos</div>
+      <ul class="lista" id="lR"></ul>
+      <div class="fila"><button class="sec" id="bR" disabled>Actualizar hojas por cuenta</button></div>
+      <div class="info" id="iR"></div>
+      <div class="descargas" id="dR"></div>
+    </details>
   </section>
 
   <section id="sA">
-    <div class="cab"><span class="num">3</span><h2>Armar el flujo del mes</h2></div>
+    <div class="cab"><span class="num">3</span><h2>Armar flujo</h2></div>
     <p class="ayuda">Sube, por empresa, el Excel <b>CLASIFICADO</b> ya revisado y el <b>RESUMEN FLUJO del mes anterior</b>.
-      Sale el RESUMEN FLUJO del mes con su formato, y un archivo de <b>notas</b> con los controles y lo que conviene mirar.</p>
+      Sale el RESUMEN FLUJO del mes con su formato, y un archivo de <b>notas</b> con los controles y lo que conviene mirar.
+      Revisa cada flujo en Excel y guárdalo antes de entregarlo.</p>
     <div class="zona" data-input="fA"><input type="file" id="fA" accept=".xlsx" multiple>Arrastra aquí los Excel clasificados y los flujos del mes anterior</div>
     <ul class="lista" id="lA"></ul>
     <div class="fila">
@@ -55,16 +66,17 @@
     <div class="descargas" id="dA"></div>
   </section>
 
-  <section id="s3" class="bloqueado">
-    <div class="cab"><span class="num">4</span><h2>Enseñarle al modelo (opcional, una vez al mes)</h2></div>
-    <p class="ayuda">¿Corregiste categorías en la hoja MOVIMIENTOS de algún Excel? Súbelo aquí. Las hojas por cuenta se rehacen
-      con tus cambios y el modelo aprende para no repetir el error el próximo mes.
-      Si en el paso 1 cargaste <b>modelo_web.pkl</b>, sube también <b>historico.csv</b>.</p>
-    <div class="zona" data-input="f3"><input type="file" id="f3" accept=".xlsx,.csv" multiple>Arrastra aquí los Excel corregidos</div>
-    <ul class="lista" id="l3"></ul>
-    <div class="fila"><button id="b3" disabled>Aprender de mis correcciones</button><button class="sec" id="b3r" hidden>Reentrenar el modelo con el histórico nuevo</button></div>
-    <div class="info" id="i3"></div>
-    <div class="descargas" id="d3"></div>
+  <section id="sH">
+    <div class="cab"><span class="num">4</span><h2>Actualizar histórico</h2></div>
+    <p class="ayuda">Cuando los flujos del mes estén corregidos y entregados, sube un <b>.zip con esos flujos</b> y el <b>historico.csv vigente</b>.
+      Si una empresa y mes ya estaban, se reemplazan. Los archivos clasificados o sin revisar se rechazan.
+      Sale el histórico nuevo con la fecha de hoy, un reporte de lo que entró y el modelo reentrenado.</p>
+    <div class="zona" data-input="fH"><input type="file" id="fH" accept=".zip,.csv,.xlsx" multiple>Arrastra aquí el .zip y el historico.csv</div>
+    <ul class="lista" id="lH"></ul>
+    <div class="fila"><button id="bH" disabled>Actualizar histórico</button></div>
+    <div class="info" id="iH"></div>
+    <div class="tabla" id="tH"></div>
+    <div class="descargas" id="dH"></div>
   </section>
 
   <details><summary>Detalle del proceso</summary><pre id="log"></pre></details>

@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from flujos.clasificacion.clasificar import clasificar
-from flujos.historico.actualizar import actualizar
-from sinteticos import D, historico, hoja_libro, libro_basico
+from flujos.clasificacion.rehacer import rehacer
+from sinteticos import D, hoja_libro, libro_basico
 
 NOMBRE = 'ICP FLUJO SETIEMBRE 2026 CLASIFICADO.xlsx'
 
@@ -57,7 +57,7 @@ def test_empresa_desconocida_se_salta(tmp_path, modelo):
     assert clasificar([libro], 2026, 9, modelo, str(tmp_path / 's')) == []
 
 
-def test_actualizar_aplica_correcciones_al_historico(salida, modelo):
+def test_rehacer_aplica_correcciones_a_las_hojas_por_cuenta(salida, modelo):
     _, ruta = salida
     wb = openpyxl.load_workbook(ruta)
     ws = wb['MOVIMIENTOS']
@@ -66,24 +66,13 @@ def test_actualizar_aplica_correcciones_al_historico(salida, modelo):
         if ws.cell(fila, col['CONCEPTO']).value == 'PAGO PROVEEDOR BETA':
             ws.cell(fila, col['CATEGORIA']).value = 'PAGO HABERES'
     wb.save(ruta)
-    h = actualizar([ruta], historico(('ICP',)), modelo)
-    nuevo = h[h.fuente == 'revision']
-    assert set(nuevo.periodo) == {'2026-09'}
-    assert nuevo[nuevo.concepto == 'PAGO PROVEEDOR BETA'].categoria.tolist() == ['PAGO HABERES']
-    # la hoja por cuenta se rehízo con la corrección
+    rehacer([ruta], modelo)
     filas = list(openpyxl.load_workbook(ruta)['BBVA$'].iter_rows(values_only=True))
     i = next(k for k, r in enumerate(filas) if r[0] == 'PAGO HABERES')
     assert 'PAGO PROVEEDOR BETA' in [r[1] for r in filas[i + 1:i + 3]]
 
 
-def test_actualizar_reemplaza_la_revision_anterior_del_mismo_mes(salida, modelo):
-    _, ruta = salida
-    primera = actualizar([ruta], historico(('ICP',)), modelo)
-    segunda = actualizar([ruta], primera, modelo)
-    assert len(segunda) == len(primera)
-
-
-def test_fechas_sospechosas_sobreviven_a_actualizar(tmp_path, modelo):
+def test_fechas_sospechosas_sobreviven_a_rehacer(tmp_path, modelo):
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     filas = [(D(2026, 8, 31), 'INI', None, None),
@@ -102,7 +91,7 @@ def test_fechas_sospechosas_sobreviven_a_actualizar(tmp_path, modelo):
 
     antes = alertas()
     assert len(antes) == 1
-    actualizar([ruta], historico(('ICP',)), modelo)
+    rehacer([ruta], modelo)
     assert alertas() == antes
     mov = pd.read_excel(ruta, sheet_name='MOVIMIENTOS')
     assert mov[mov.CONCEPTO == 'PAGO PROVEEDOR BETA'].REVISAR.tolist() == ['SI']
@@ -112,4 +101,4 @@ def test_nombre_invalido_da_error_claro(tmp_path, modelo):
     ruta = tmp_path / 'cualquiera.xlsx'
     openpyxl.Workbook().save(ruta)
     with pytest.raises(ValueError, match='no parece un Excel clasificado'):
-        actualizar([str(ruta)], historico(('ICP',)), modelo)
+        rehacer([str(ruta)], modelo)

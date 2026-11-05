@@ -1,6 +1,7 @@
 const WHEELS = /*__WHEELS__*/;
 const $ = (id) => document.getElementById(id);
-const log = (t) => { $('log').textContent += t + '\n'; $('log').scrollTop = 1e9; };
+let ultimoAviso = '';
+const log = (t) => { ultimoAviso = t; $('log').textContent += t + '\n'; $('log').scrollTop = 1e9; };
 
 // ---------- motor (Python en un Web Worker para no congelar la página) ----------
 const worker = new Worker(URL.createObjectURL(new Blob([$('codigoWorker').textContent], { type: 'text/javascript' })));
@@ -27,7 +28,11 @@ async function trabajar(infoId, texto, fn) {
   ocupado = true; actualizarBotones();
   const t0 = Date.now(), info = $(infoId);
   info.className = 'info';
-  const reloj = setInterval(() => { info.innerHTML = `<span class="girando"></span>${texto} (${Math.round((Date.now() - t0) / 1000)} s)`; }, 500);
+  ultimoAviso = '';
+  const reloj = setInterval(() => {
+    info.innerHTML = `<span class="girando"></span>${texto} (${Math.round((Date.now() - t0) / 1000)} s)` +
+      (ultimoAviso ? `<div class="aviso-paso">${esc(ultimoAviso.split('\n')[0])}</div>` : '');
+  }, 500);
   info.innerHTML = `<span class="girando"></span>${texto}`;
   try { await fn(info); }
   catch (e) { info.className = 'info err'; info.textContent = 'Error: ' + e.message; log('ERROR: ' + e.message); }
@@ -53,15 +58,15 @@ function zona(inputId, alCambiar) {
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const lista = (id, files) => { $(id).innerHTML = files.map(f => `<li>📄 ${esc(f.name)}</li>`).join(''); };
 
-let motorListo = false, hayModelo = false, libros = [], revisados = [], archivosA = [];
+let motorListo = false, hayModelo = false, libros = [], revisados = [], archivosA = [], archivosH = [];
 function actualizarBotones() {
   $('s2').classList.toggle('bloqueado', !hayModelo);
-  $('s3').classList.toggle('bloqueado', !hayModelo);
   $('b2').disabled = ocupado || !libros.length;
-  $('b3').disabled = ocupado || !revisados.some(f => /\.xlsx$/i.test(f.name));
-  $('b3r').disabled = ocupado;
+  $('bR').disabled = ocupado || !revisados.length;
   const tc = Number($('tcA').value);
   $('bA').disabled = ocupado || !motorListo || !archivosA.length || !(tc > 2 && tc < 6);
+  const hayCsv = archivosH.filter(f => /\.csv$/i.test(f.name)).length === 1;
+  $('bH').disabled = ocupado || !motorListo || !hayCsv || !archivosH.some(f => /\.(zip|xlsx)$/i.test(f.name));
   $('usarCache').disabled = ocupado || !motorListo;
 }
 
@@ -180,24 +185,45 @@ $('bA').onclick = () => trabajar('iA', 'Armando el flujo… puede tardar un par 
   descargas('dA', r.salidas, s => s.nombre.endsWith('.zip'));
 });
 
-// ---------- paso 4 ----------
-zona('f3', (files) => { revisados = files; lista('l3', files); actualizarBotones(); });
-$('b3').onclick = () => trabajar('i3', 'Actualizando…', async (info) => {
-  const csv = revisados.find(f => /\.csv$/i.test(f.name));
-  const xlsx = revisados.filter(f => /\.xlsx$/i.test(f.name));
-  const archivos = await leer(csv ? [...xlsx, csv] : xlsx);
-  const args = ['$rutas_xlsx', csv ? '/entrada/' + csv.name : null, Number($('umbral').value) / 100];
-  const r = await llamar('actualizar', args.map(a => a === '$rutas_xlsx' ? xlsx.map(f => '/entrada/' + f.name) : a), archivos);
-  info.className = 'info ok';
-  info.textContent = `✔ Listo. Descarga los Excel rehechos y el historico.csv nuevo (reemplaza el del disco compartido).`;
-  descargas('d3', r.salidas);
-  $('b3r').hidden = false;
+// ---------- opcional del paso 2: rehacer las hojas por cuenta ----------
+zona('fR', (files) => {
+  revisados = files.filter(f => /\.xlsx$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('lR', revisados); actualizarBotones();
 });
-$('b3r').onclick = () => trabajar('i3', 'Reentrenando el modelo… (unos minutos)', async (info) => {
-  const r = await llamar('reentrenar', []);
-  await modeloEntrenado(r, info);
-  descargas('d3', r.salidas);
-  $('i1').className = 'info ok'; $('i1').textContent = info.textContent;
+$('bR').onclick = () => trabajar('iR', 'Actualizando las hojas por cuenta…', async (info) => {
+  const r = await llamar('rehacer_clasificados', ['$rutas', Number($('umbral').value) / 100], await leer(revisados));
+  info.className = 'info ok';
+  info.textContent = `✔ Excel actualizados: ${r.valor.archivos}. Descárgalos aquí abajo.`;
+  descargas('dR', r.salidas);
+});
+
+// ---------- paso 4 ----------
+zona('fH', (files) => {
+  archivosH = files.filter(f => /\.(zip|csv|xlsx)$/i.test(f.name) && !f.name.startsWith('~$'));
+  lista('lH', archivosH); actualizarBotones();
+});
+$('bH').onclick = () => trabajar('iH', 'Actualizando el histórico… el reentrenamiento puede tardar unos minutos.', async (info) => {
+  $('tH').innerHTML = ''; $('dH').innerHTML = '';
+  const r = await llamar('actualizar_historico', ['$rutas'], await leer(archivosH));
+  const v = r.valor;
+  const num = (n) => n.toLocaleString('es-PE');
+  info.className = v.incorporados && !v.rechazados ? 'info ok' : 'info err';
+  info.textContent = v.incorporados
+    ? `Flujos incorporados: ${v.incorporados}. Movimientos: de ${num(v.movimientos_antes)} a ${num(v.movimientos)}. ` +
+      (v.rechazados ? `Archivos rechazados: ${v.rechazados}, mira abajo. ` : '') + `Modelo reentrenado. Avisos en el reporte: ${v.avisos}. ` +
+      'Guarda el histórico y el modelo en el disco compartido, sin borrar las versiones anteriores.'
+    : 'Ningún flujo entró al histórico: mira los motivos aquí abajo.';
+  $('tH').innerHTML =
+    (v.filas.length ? '<table><tr><th>Empresa</th><th>Mes</th><th>Qué pasó</th><th class="n">Antes</th><th class="n">Ahora</th></tr>' +
+      v.filas.map(x => `<tr><td><b>${esc(x.empresa)}</b></td><td>${esc(x.periodo)}</td><td>${esc(x.accion)}</td><td class="n">${num(x.antes)}</td><td class="n">${num(x.ahora)}</td></tr>`).join('') + '</table>' : '') +
+    (v.rechazos.length ? '<table><tr><th>Archivo rechazado</th><th>Motivo</th></tr>' +
+      v.rechazos.map(x => `<tr><td>${esc(x.archivo)}</td><td><span class="chip bad">${esc(x.motivo)}</span></td></tr>`).join('') + '</table>' : '');
+  descargas('dH', r.salidas);
+  const pkl = r.salidas.find(s => s.nombre === 'modelo_web.pkl');
+  if (pkl) {
+    await guardarCache(pkl.bytes.slice(0), { fecha: new Date().toISOString(), ...v.modelo });
+    const i1 = $('i1'); mostrarModelo(i1, v.modelo); $('d1').innerHTML = '';
+  }
 });
 
 // ---------- arranque ----------

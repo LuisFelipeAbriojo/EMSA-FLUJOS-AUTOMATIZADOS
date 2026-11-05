@@ -68,3 +68,6 @@
   .girando { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent;
              border-radius: 50%; animation: g 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes g { to { transform: rotate(360deg); } }
+.aviso-paso { font-size: 12px; opacity: .75; margin-top: 4px; overflow-wrap: anywhere; }
+details.opcional { margin-top: 14px; }
+details.opcional summary { cursor: pointer; font-size: 13px; }
