@@ -1,9 +1,36 @@
-__pycache__/
+# Datos de las empresas: NUNCA van a este repositorio público
+*.xlsx
+*.xlsm
+*.xlsb
+*.xls
+*.xltx
+*.csv
+*.tsv
 *.pkl
-historico*.csv
+*.pickle
+*.joblib
+*.zip
+*.7z
+*.rar
+*.parquet
+*.pdf
+~$*
 LIBROS/
 SALIDA/
-*.xlsx
-~$*
+datos/
+datos_privados/
+config.local.toml
+
+# Notas locales (hasta pasarlas a docs/ sin datos)
 CONTEXTO.md
+
+# Python y herramientas
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
 .claude/

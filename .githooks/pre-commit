@@ -1,0 +1,3 @@
+#!/bin/sh
+# Se activa con: git config core.hooksPath .githooks
+exec python "$(git rev-parse --show-toplevel)/scripts/verificar_privacidad.py"
